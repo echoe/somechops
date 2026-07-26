@@ -1,5 +1,7 @@
 # SomeChops
 
+<img src=https://raw.githubusercontent.com/echoe/somechops/refs/heads/main/picture.png width="600" height="480" />
+
 A JUCE plugin: load a sample, auto-slice it at transients into a playable
 drumkit, sequence it with a 16-step per-pad sequencer (ratchet/pitch/
 probability per step, 32 pattern slots), and save/load presets that embed
