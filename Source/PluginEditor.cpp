@@ -158,7 +158,12 @@ PadGrid::PadGrid (SomeChopsAudioProcessor& p) : processor (p)
     {
         auto* b = padButtons.add (new juce::TextButton ("Pad " + juce::String (i + 1)));
         addAndMakeVisible (b);
-        b->onClick = [this, i] { processor.triggerPadFromUI (i); };
+        b->onClick = [this, i]
+        {
+            processor.triggerPadFromUI (i);
+            if (onPadSelected)
+                onPadSelected (i);
+        };
     }
     startTimerHz (15);
 }
@@ -492,6 +497,8 @@ SlicePitchRow::SlicePitchRow (SomeChopsAudioProcessor& p) : processor (p)
 
             sampler.setSlicePitch (i, (float) s->getValue());
             updateLabel (i);
+            if (onPitchChanged)
+                onPitchChanged();
         };
     }
     startTimerHz (15);
@@ -687,7 +694,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
       trackLengthColumn (p),
       settingsPanel (p)
 {
-    setSize (1200, 862);
+    setSize (1200, 930);
 
     addAndMakeVisible (loadButton);
     addAndMakeVisible (autoSliceButton);
@@ -705,6 +712,13 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     addAndMakeVisible (slicePitchRow);
     addAndMakeVisible (sliceRangeRow);
     addAndMakeVisible (padGrid);
+    addAndMakeVisible (selectedSliceLabel);
+    addAndMakeVisible (sliceStartFieldLabel);
+    addAndMakeVisible (sliceStartEditor);
+    addAndMakeVisible (sliceEndFieldLabel);
+    addAndMakeVisible (sliceEndEditor);
+    addAndMakeVisible (slicePitchFieldLabel);
+    addAndMakeVisible (slicePitchEditor);
     addAndMakeVisible (patternSelector);
     addAndMakeVisible (randomizeButton);
     addAndMakeVisible (clearButton);
@@ -715,6 +729,9 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     addAndMakeVisible (pitchRangeLabel);
     addAndMakeVisible (maxRatchetSlider);
     addAndMakeVisible (maxRatchetLabel);
+    addAndMakeVisible (nudgeRangeSlider);
+    addAndMakeVisible (nudgeRangeLabel);
+    addAndMakeVisible (randomizeLengthsToggle);
     addAndMakeVisible (stepGrid);
     addAndMakeVisible (trackLengthColumn);
     addAndMakeVisible (selectedStepLabel);
@@ -748,6 +765,10 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     maxRatchetSlider.setValue (4.0);
     maxRatchetSlider.setSliderStyle (juce::Slider::LinearHorizontal);
 
+    nudgeRangeSlider.setRange (0.0, 50.0, 1.0);
+    nudgeRangeSlider.setValue (0.0);
+    nudgeRangeSlider.setSliderStyle (juce::Slider::LinearHorizontal);
+
     // Ratchet/probability made longer with visible text boxes so exact values are easy to read.
     stepRatchetSlider.setRange (1.0, 8.0, 1.0);
     stepRatchetSlider.setSliderStyle (juce::Slider::LinearHorizontal);
@@ -761,6 +782,57 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     stepNudgeSlider.setRange (-50.0, 50.0, 0.5);
     stepNudgeSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     stepNudgeSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 50, 20);
+
+    // Exact-value slice editor fields — samples for start/end (matches the underlying
+    // API exactly), semitones (with decimals) for pitch.
+    sliceStartEditor.setInputRestrictions (0, "0123456789");
+    sliceEndEditor.setInputRestrictions (0, "0123456789");
+    slicePitchEditor.setInputRestrictions (0, "-0123456789.");
+    sliceStartEditor.setEnabled (false);
+    sliceEndEditor.setEnabled (false);
+    slicePitchEditor.setEnabled (false);
+
+    auto commitSliceEdits = [this]
+    {
+        if (selectedSlice < 0 || selectedSlice >= processor.getSampler().getNumSlices())
+            return;
+
+        auto& sampler = processor.getSampler();
+        const auto sl = sampler.getSlice (selectedSlice); // copy: bounds calls below may reallocate the reference
+
+        const int newStart = sliceStartEditor.getText().getIntValue();
+        const int newEnd = sliceEndEditor.getText().getIntValue();
+        const float newPitch = slicePitchEditor.getText().getFloatValue();
+
+        // Same ordering as the slider path: move start (keeping the outer/detected end
+        // boundary), then set the adjustable end within that boundary. Nothing here
+        // clamps against neighboring slices — overlapping slices are allowed.
+        sampler.setSliceBounds (selectedSlice, newStart, sl.endSample);
+        sampler.setSliceTrimmedLength (selectedSlice, newEnd);
+        sampler.setSlicePitch (selectedSlice, newPitch);
+
+        updateSelectedSliceControls(); // reflect whatever actually got clamped/applied
+        waveformView.repaint();
+    };
+
+    sliceStartEditor.onReturnKey = commitSliceEdits;
+    sliceStartEditor.onFocusLost = commitSliceEdits;
+    sliceEndEditor.onReturnKey = commitSliceEdits;
+    sliceEndEditor.onFocusLost = commitSliceEdits;
+    slicePitchEditor.onReturnKey = commitSliceEdits;
+    slicePitchEditor.onFocusLost = commitSliceEdits;
+
+    padGrid.onPadSelected = [this] (int pad)
+    {
+        selectedSlice = pad;
+        updateSelectedSliceControls();
+    };
+    sliceRangeRow.onSliceChanged = [this]
+    {
+        waveformView.repaint();
+        updateSelectedSliceControls();
+    };
+    slicePitchRow.onPitchChanged = [this] { updateSelectedSliceControls(); };
 
     refreshPatternSelector();
 
@@ -784,6 +856,8 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
                 if (file.existsAsFile())
                 {
                     processor.loadSampleFromFile (file);
+                    selectedSlice = -1;
+                    updateSelectedSliceControls();
                     waveformView.rebuildWaveformCache();
                     waveformView.repaint();
                 }
@@ -793,6 +867,8 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     autoSliceButton.onClick = [this]
     {
         processor.getSampler().autoSlice ((float) sensitivitySlider.getValue());
+        selectedSlice = -1;
+        updateSelectedSliceControls();
         waveformView.repaint();
     };
 
@@ -834,6 +910,8 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
                         processor.manualBpm = bpm;
                         bpmSlider.setValue (bpm, juce::dontSendNotification);
                         settingsPanel.refresh();
+                        selectedSlice = -1;
+                        updateSelectedSliceControls();
                         waveformView.rebuildWaveformCache();
                         waveformView.repaint();
                     }
@@ -855,8 +933,6 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
         processor.midiSettings.quantizePatternChanges = quantizePatternChangeToggle.getToggleState();
     };
 
-    sliceRangeRow.onSliceChanged = [this] { waveformView.repaint(); };
-
     playStopButton.onClick = [this]
     {
         processor.manualPlayActive = ! processor.manualPlayActive;
@@ -876,7 +952,8 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     randomizeButton.onClick = [this]
     {
         processor.getSequencer().randomizeAllTracks ((float) densitySlider.getValue(),
-            (float) pitchRangeSlider.getValue(), (int) maxRatchetSlider.getValue());
+            (float) pitchRangeSlider.getValue(), (int) maxRatchetSlider.getValue(),
+            (float) nudgeRangeSlider.getValue(), randomizeLengthsToggle.getToggleState());
         stepGrid.repaint();
     };
 
@@ -919,6 +996,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     };
 
     updateSelectedStepControls();
+    updateSelectedSliceControls();
 }
 
 void SomeChopsAudioProcessorEditor::refreshPatternSelector()
@@ -950,6 +1028,33 @@ void SomeChopsAudioProcessorEditor::updateSelectedStepControls()
     stepPitchSlider.setValue (stepData.pitchSemitones, juce::dontSendNotification);
     stepProbabilitySlider.setValue (stepData.probability, juce::dontSendNotification);
     stepNudgeSlider.setValue (stepData.nudge, juce::dontSendNotification);
+}
+
+void SomeChopsAudioProcessorEditor::updateSelectedSliceControls()
+{
+    auto& sampler = processor.getSampler();
+    const bool hasSelection = selectedSlice >= 0 && selectedSlice < sampler.getNumSlices();
+
+    sliceStartEditor.setEnabled (hasSelection);
+    sliceEndEditor.setEnabled (hasSelection);
+    slicePitchEditor.setEnabled (hasSelection);
+
+    if (! hasSelection)
+    {
+        selectedSliceLabel.setText ("No slice selected", juce::dontSendNotification);
+        return;
+    }
+
+    // Don't clobber a field the user is actively typing in.
+    const auto& sl = sampler.getSlice (selectedSlice);
+    selectedSliceLabel.setText ("Slice " + juce::String (selectedSlice + 1), juce::dontSendNotification);
+
+    if (! sliceStartEditor.hasKeyboardFocus (false))
+        sliceStartEditor.setText (juce::String (sl.startSample), juce::dontSendNotification);
+    if (! sliceEndEditor.hasKeyboardFocus (false))
+        sliceEndEditor.setText (juce::String (sl.trimmedEnd), juce::dontSendNotification);
+    if (! slicePitchEditor.hasKeyboardFocus (false))
+        slicePitchEditor.setText (juce::String (sl.basePitch, 1), juce::dontSendNotification);
 }
 
 void SomeChopsAudioProcessorEditor::paint (juce::Graphics& g)
@@ -1002,6 +1107,20 @@ void SomeChopsAudioProcessorEditor::resized()
     r.removeFromTop (4);
     padGrid.setBounds (r.removeFromTop (50));
 
+    // Exact-value slice editor: populated by clicking a pad above.
+    r.removeFromTop (6);
+    auto sliceEditorBar = r.removeFromTop (28);
+    selectedSliceLabel.setBounds (sliceEditorBar.removeFromLeft (120));
+    sliceEditorBar.removeFromLeft (10);
+    sliceStartFieldLabel.setBounds (sliceEditorBar.removeFromLeft (110));
+    sliceStartEditor.setBounds (sliceEditorBar.removeFromLeft (70));
+    sliceEditorBar.removeFromLeft (14);
+    sliceEndFieldLabel.setBounds (sliceEditorBar.removeFromLeft (100));
+    sliceEndEditor.setBounds (sliceEditorBar.removeFromLeft (70));
+    sliceEditorBar.removeFromLeft (14);
+    slicePitchFieldLabel.setBounds (sliceEditorBar.removeFromLeft (120));
+    slicePitchEditor.setBounds (sliceEditorBar.removeFromLeft (70));
+
     // Pattern selection/switching controls on their own row...
     r.removeFromTop (8);
     auto patternBar = r.removeFromTop (28);
@@ -1009,7 +1128,7 @@ void SomeChopsAudioProcessorEditor::resized()
     patternBar.removeFromLeft (10);
     quantizePatternChangeToggle.setBounds (patternBar.removeFromLeft (150));
 
-    // ...and randomization gets its own row below, so its sliders can be much longer.
+    // ...and randomization gets its own two rows below, so its sliders can be much longer.
     r.removeFromTop (6);
     auto randomizeBar = r.removeFromTop (28);
     randomizeButton.setBounds (randomizeBar.removeFromLeft (110));
@@ -1024,6 +1143,14 @@ void SomeChopsAudioProcessorEditor::resized()
     randomizeBar.removeFromLeft (14);
     maxRatchetLabel.setBounds (randomizeBar.removeFromLeft (85));
     maxRatchetSlider.setBounds (randomizeBar.removeFromLeft (220));
+
+    r.removeFromTop (6);
+    auto randomizeBar2 = r.removeFromTop (28);
+    randomizeBar2.removeFromLeft (214); // align under randomizeBar's sliders, past the two buttons
+    nudgeRangeLabel.setBounds (randomizeBar2.removeFromLeft (85));
+    nudgeRangeSlider.setBounds (randomizeBar2.removeFromLeft (220));
+    randomizeBar2.removeFromLeft (14);
+    randomizeLengthsToggle.setBounds (randomizeBar2.removeFromLeft (220));
 
     r.removeFromTop (6);
     auto stepEditorRow2 = r.removeFromBottom (28); // Probability + Nudge

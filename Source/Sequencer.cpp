@@ -100,13 +100,15 @@ void Sequencer::clearPattern (int patternIndex)
             step = StepData {};
 }
 
-void Sequencer::randomizeTrack (int trackIndex, float density, float pitchRangeSemitones, int maxRatchet)
+void Sequencer::randomizeTrack (int trackIndex, float density, float pitchRangeSemitones, int maxRatchet,
+                                 float nudgeRangePercent, bool randomizeLength)
 {
     if (trackIndex < 0 || trackIndex >= kNumPads)
         return;
 
     std::uniform_real_distribution<float> unit (0.0f, 1.0f);
     std::uniform_real_distribution<float> pitchDist (-pitchRangeSemitones, pitchRangeSemitones);
+    std::uniform_real_distribution<float> nudgeDist (-nudgeRangePercent, nudgeRangePercent);
     std::uniform_int_distribution<int> ratchetDist (1, juce::jmax (1, maxRatchet));
 
     auto& track = getCurrentPattern().tracks[(size_t) trackIndex];
@@ -116,13 +118,23 @@ void Sequencer::randomizeTrack (int trackIndex, float density, float pitchRangeS
         step.pitchSemitones = step.enabled ? pitchDist (rng) : 0.0f;
         step.ratchet = step.enabled ? ratchetDist (rng) : 1;
         step.probability = step.enabled ? juce::jmap (unit (rng), 0.0f, 1.0f, 60.0f, 100.0f) : 100.0f;
+        step.nudge = step.enabled ? nudgeDist (rng) : 0.0f;
+    }
+
+    if (randomizeLength)
+    {
+        // 4..kNumSteps rather than 1..kNumSteps — avoids absurdly short 1-2 step loops
+        // that would rarely be musically useful, while still giving real polymeter variety.
+        std::uniform_int_distribution<int> lengthDist (4, kNumSteps);
+        setTrackNumSteps (trackIndex, lengthDist (rng));
     }
 }
 
-void Sequencer::randomizeAllTracks (float density, float pitchRangeSemitones, int maxRatchet)
+void Sequencer::randomizeAllTracks (float density, float pitchRangeSemitones, int maxRatchet,
+                                     float nudgeRangePercent, bool randomizeLength)
 {
     for (int t = 0; t < kNumPads; ++t)
-        randomizeTrack (t, density, pitchRangeSemitones, maxRatchet);
+        randomizeTrack (t, density, pitchRangeSemitones, maxRatchet, nudgeRangePercent, randomizeLength);
 }
 
 std::vector<SequencerHit> Sequencer::processBlock (int numSamples)

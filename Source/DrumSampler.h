@@ -73,7 +73,7 @@ public:
     double getSourceSampleRate() const { return sourceSampleRate; }
 
     // For preset save/load: replace slices wholesale (e.g. loaded from XML).
-    void setSlices (std::vector<Slice> newSlices) { slices = std::move (newSlices); }
+    void setSlices (std::vector<Slice> newSlices);
 
 private:
     juce::AudioBuffer<float> sourceBuffer;
@@ -84,11 +84,20 @@ private:
     std::array<DrumVoice, kMaxVoices> voices;
     bool chokeMode = false;
 
+    // Guards sourceBuffer/slices/voices against the message thread (sample loading,
+    // slicing, slider edits) and the audio thread (triggerPad/renderNextBlock)
+    // touching them at the same time. A prior version of this class had no such
+    // guard, which could crash — e.g. loadSample() clearing `slices` on the message
+    // thread while the audio thread was mid-render and still indexing into it.
+    juce::CriticalSection lock;
+
     static constexpr int kFadeSamples = 64; // click-free fade out at slice end
 
     int findFreeVoice();
 
     // Fades out all currently active voices quickly (over kFadeSamples) rather than
-    // hard-cutting them, so choke mode doesn't click.
+    // hard-cutting them, so choke mode doesn't click. Only ever called from within
+    // triggerPad(), which already holds `lock` (CriticalSection is re-entrant on the
+    // same thread, so this doesn't need its own lock).
     void chokeAllVoices();
 };

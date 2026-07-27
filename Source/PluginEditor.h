@@ -39,6 +39,10 @@ public:
     explicit PadGrid (SomeChopsAudioProcessor& p);
     void resized() override;
 
+    // Fired (in addition to triggering playback) whenever a pad button is clicked,
+    // so the exact-value slice editor can show that slice's numbers.
+    std::function<void (int pad)> onPadSelected;
+
 private:
     SomeChopsAudioProcessor& processor;
     juce::OwnedArray<juce::TextButton> padButtons;
@@ -78,6 +82,10 @@ class SlicePitchRow : public juce::Component, private juce::Timer
 public:
     explicit SlicePitchRow (SomeChopsAudioProcessor& p);
     void resized() override;
+
+    // Fired whenever a slice's pitch changes via these sliders, so the exact-value
+    // slice editor can stay in sync if it's currently showing that slice.
+    std::function<void()> onPitchChanged;
 
 private:
     SomeChopsAudioProcessor& processor;
@@ -209,8 +217,10 @@ private:
     juce::TextButton randomizeButton { "Randomize All" };
     juce::TextButton clearButton { "Clear Pattern" };
     juce::ToggleButton quantizePatternChangeToggle { "Wait for pattern end" };
-    juce::Slider densitySlider, pitchRangeSlider, maxRatchetSlider;
-    juce::Label densityLabel { {}, "Density" }, pitchRangeLabel { {}, "Pitch Range" }, maxRatchetLabel { {}, "Max Ratchet" };
+    juce::Slider densitySlider, pitchRangeSlider, maxRatchetSlider, nudgeRangeSlider;
+    juce::Label densityLabel { {}, "Density" }, pitchRangeLabel { {}, "Pitch Range" }, maxRatchetLabel { {}, "Max Ratchet" },
+                nudgeRangeLabel { {}, "Nudge Range" };
+    juce::ToggleButton randomizeLengthsToggle { "Randomize Lane Lengths" };
 
     StepGrid stepGrid;
     TrackLengthColumn trackLengthColumn;
@@ -221,10 +231,20 @@ private:
     juce::Label stepRatchetLabel { {}, "Ratchet" }, stepPitchLabel { {}, "Pitch" }, stepProbLabel { {}, "Probability" }, stepNudgeLabel { {}, "Nudge" };
     int selectedPad = -1, selectedStep = -1;
 
+    // Exact-value slice editor: type precise numbers instead of dragging sliders.
+    // Selecting a pad (click in PadGrid) populates these. Slices are allowed to
+    // overlap — nothing here or in DrumSampler clamps a slice against its neighbors.
+    juce::Label selectedSliceLabel { {}, "No slice selected" };
+    juce::Label sliceStartFieldLabel { {}, "Start (samples)" }, sliceEndFieldLabel { {}, "End (samples)" },
+                slicePitchFieldLabel { {}, "Pitch (semitones)" };
+    juce::TextEditor sliceStartEditor, sliceEndEditor, slicePitchEditor;
+    int selectedSlice = -1;
+
     std::unique_ptr<juce::FileChooser> fileChooser;
     SettingsPanel settingsPanel;
 
     void updateSelectedStepControls();
+    void updateSelectedSliceControls();
     void refreshPatternSelector();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SomeChopsAudioProcessorEditor)

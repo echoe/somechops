@@ -10,10 +10,14 @@ void DrumSampler::prepare (double sampleRate, int /*maxBlockSize*/)
 
 void DrumSampler::loadSample (juce::AudioBuffer<float> newSample, double sourceSR)
 {
+    // newSample has already been fully read from disk by the caller; this just installs
+    // it. The move-assignment and clear() below are cheap, so holding the lock for them
+    // won't meaningfully block the audio thread.
+    const juce::ScopedLock sl (lock);
     sourceBuffer = std::move (newSample);
     sourceSampleRate = sourceSR;
     slices.clear();
-    stopAllVoices();
+    stopAllVoices(); // safe to call while already holding `lock` — CriticalSection is re-entrant
 }
 
 void DrumSampler::autoSlice (float sensitivity)
@@ -25,6 +29,10 @@ void DrumSampler::autoSlice (float sensitivity)
     s.sensitivity = sensitivity;
     TransientDetector detector (s);
 
+    // Reading sourceBuffer here without holding `lock` is safe: the only thing that
+    // ever replaces it is loadSample(), which — like this method — only ever runs on
+    // the message thread, so the two can't overlap with each other. The audio thread
+    // never writes to sourceBuffer, only reads it, so two concurrent reads are fine.
     auto onsets = detector.findOnsets (sourceBuffer, sourceSampleRate);
     if (onsets.empty())
         return;
@@ -32,7 +40,7 @@ void DrumSampler::autoSlice (float sensitivity)
     if ((int) onsets.size() > kMaxSlices)
         onsets.resize ((size_t) kMaxSlices);
 
-    slices.clear();
+    std::vector<Slice> newSlices;
     for (size_t i = 0; i < onsets.size(); ++i)
     {
         Slice sl;
@@ -40,38 +48,53 @@ void DrumSampler::autoSlice (float sensitivity)
         sl.endSample = (i + 1 < onsets.size()) ? onsets[i + 1] : sourceBuffer.getNumSamples();
         sl.trimmedEnd = sl.endSample;
         sl.name = "Slice " + juce::String ((int) i + 1);
-        slices.push_back (sl);
+        newSlices.push_back (sl);
     }
+
+    const juce::ScopedLock sl (lock);
+    slices = std::move (newSlices);
 }
 
 void DrumSampler::setSliceBounds (int sliceIndex, int startSample, int endSample)
 {
+    const juce::ScopedLock sl (lock);
+
     if (sliceIndex < 0 || sliceIndex >= (int) slices.size())
         return;
 
-    auto& sl = slices[(size_t) sliceIndex];
-    sl.startSample = juce::jlimit (0, sourceBuffer.getNumSamples() - 1, startSample);
-    sl.endSample = juce::jlimit (sl.startSample + 1, sourceBuffer.getNumSamples(), endSample);
-    sl.trimmedEnd = juce::jmin (sl.trimmedEnd, sl.endSample);
-    if (sl.trimmedEnd <= sl.startSample)
-        sl.trimmedEnd = sl.endSample;
+    auto& slc = slices[(size_t) sliceIndex];
+    slc.startSample = juce::jlimit (0, sourceBuffer.getNumSamples() - 1, startSample);
+    slc.endSample = juce::jlimit (slc.startSample + 1, sourceBuffer.getNumSamples(), endSample);
+    slc.trimmedEnd = juce::jmin (slc.trimmedEnd, slc.endSample);
+    if (slc.trimmedEnd <= slc.startSample)
+        slc.trimmedEnd = slc.endSample;
 }
 
 void DrumSampler::setSliceTrimmedLength (int sliceIndex, int newTrimmedEnd)
 {
+    const juce::ScopedLock sl (lock);
+
     if (sliceIndex < 0 || sliceIndex >= (int) slices.size())
         return;
 
-    auto& sl = slices[(size_t) sliceIndex];
-    sl.trimmedEnd = juce::jlimit (sl.startSample + 1, sl.endSample, newTrimmedEnd);
+    auto& slc = slices[(size_t) sliceIndex];
+    slc.trimmedEnd = juce::jlimit (slc.startSample + 1, slc.endSample, newTrimmedEnd);
 }
 
 void DrumSampler::setSlicePitch (int sliceIndex, float semitones)
 {
+    const juce::ScopedLock sl (lock);
+
     if (sliceIndex < 0 || sliceIndex >= (int) slices.size())
         return;
 
     slices[(size_t) sliceIndex].basePitch = juce::jlimit (-24.0f, 24.0f, semitones);
+}
+
+void DrumSampler::setSlices (std::vector<Slice> newSlices)
+{
+    const juce::ScopedLock sl (lock);
+    slices = std::move (newSlices);
 }
 
 int DrumSampler::findFreeVoice()
@@ -96,6 +119,8 @@ int DrumSampler::findFreeVoice()
 
 void DrumSampler::triggerPad (int padIndex, float pitchSemitones, float gain, int delaySamples)
 {
+    const juce::ScopedLock sl (lock);
+
     if (padIndex < 0 || padIndex >= (int) slices.size())
         return;
 
@@ -138,12 +163,15 @@ void DrumSampler::chokeAllVoices()
 
 void DrumSampler::stopAllVoices()
 {
+    const juce::ScopedLock sl (lock);
     for (auto& v : voices)
         v.active = false;
 }
 
 void DrumSampler::renderNextBlock (juce::AudioBuffer<float>& output, int startSample, int numSamples)
 {
+    const juce::ScopedLock sl (lock);
+
     const int numOutCh = output.getNumChannels();
     const int srcCh = sourceBuffer.getNumChannels();
     if (srcCh == 0)
@@ -163,8 +191,8 @@ void DrumSampler::renderNextBlock (juce::AudioBuffer<float>& output, int startSa
             continue;
         }
 
-        const auto& sl = slices[(size_t) v.sliceIndex];
-        const int sliceLen = sl.getPlaybackLength();
+        const auto& curSlice = slices[(size_t) v.sliceIndex];
+        const int sliceLen = curSlice.getPlaybackLength();
         const double readRatio = v.pitchRatio * srRatio;
 
         for (int i = 0; i < numSamples; ++i)
@@ -181,7 +209,7 @@ void DrumSampler::renderNextBlock (juce::AudioBuffer<float>& output, int startSa
                 break;
             }
 
-            const double srcPosD = sl.startSample + v.position;
+            const double srcPosD = curSlice.startSample + v.position;
             const int srcPos0 = (int) srcPosD;
             const int srcPos1 = juce::jmin (srcPos0 + 1, sourceBuffer.getNumSamples() - 1);
             const float frac = (float) (srcPosD - (double) srcPos0);

@@ -79,8 +79,10 @@ public:
     Pattern& getCurrentPattern() { return patterns[(size_t) currentPatternIndex]; }
     const Pattern& getCurrentPattern() const { return patterns[(size_t) currentPatternIndex]; }
 
-    void randomizeTrack (int trackIndex, float density, float pitchRangeSemitones, int maxRatchet);
-    void randomizeAllTracks (float density, float pitchRangeSemitones, int maxRatchet);
+    void randomizeTrack (int trackIndex, float density, float pitchRangeSemitones, int maxRatchet,
+                         float nudgeRangePercent, bool randomizeLength);
+    void randomizeAllTracks (float density, float pitchRangeSemitones, int maxRatchet,
+                              float nudgeRangePercent, bool randomizeLength);
     void clearPattern (int patternIndex);
 
     int getCurrentStep() const { return currentStep; }
