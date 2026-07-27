@@ -37,6 +37,7 @@ class PadGrid : public juce::Component, private juce::Timer
 {
 public:
     explicit PadGrid (SomeChopsAudioProcessor& p);
+    ~PadGrid() override { stopTimer(); }
     void resized() override;
 
     // Fired (in addition to triggering playback) whenever a pad button is clicked,
@@ -58,6 +59,7 @@ class SliceRangeRow : public juce::Component, private juce::Timer
 {
 public:
     explicit SliceRangeRow (SomeChopsAudioProcessor& p);
+    ~SliceRangeRow() override { stopTimer(); }
     void resized() override;
 
     // Fired whenever a slice's start/end changes via these sliders, so the
@@ -81,6 +83,7 @@ class SlicePitchRow : public juce::Component, private juce::Timer
 {
 public:
     explicit SlicePitchRow (SomeChopsAudioProcessor& p);
+    ~SlicePitchRow() override { stopTimer(); }
     void resized() override;
 
     // Fired whenever a slice's pitch changes via these sliders, so the exact-value
@@ -105,6 +108,7 @@ class StepGrid : public juce::Component, private juce::Timer
 {
 public:
     explicit StepGrid (SomeChopsAudioProcessor& p);
+    ~StepGrid() override { stopTimer(); }
     void paint (juce::Graphics&) override;
     void resized() override;
     void mouseDown (const juce::MouseEvent&) override;
@@ -125,6 +129,7 @@ class TrackLengthColumn : public juce::Component, private juce::Timer
 {
 public:
     explicit TrackLengthColumn (SomeChopsAudioProcessor& p);
+    ~TrackLengthColumn() override { stopTimer(); }
     void resized() override;
 
 private:
@@ -185,7 +190,7 @@ class SomeChopsAudioProcessorEditor : public juce::AudioProcessorEditor
 {
 public:
     explicit SomeChopsAudioProcessorEditor (SomeChopsAudioProcessor&);
-    ~SomeChopsAudioProcessorEditor() override = default;
+    ~SomeChopsAudioProcessorEditor() override;
 
     void paint (juce::Graphics&) override;
     void resized() override;
