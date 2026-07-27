@@ -212,7 +212,7 @@ SliceRangeRow::SliceRangeRow (SomeChopsAudioProcessor& p) : processor (p)
         auto* label = rangeLabels.add (new juce::Label());
         addAndMakeVisible (label);
         label->setJustificationType (juce::Justification::centred);
-        label->setFont (juce::Font (11.0f));
+        label->setFont (juce::Font (juce::FontOptions (11.0f)));
         label->setColour (juce::Label::textColourId, juce::Colours::lightgrey);
         label->setText ("--", juce::dontSendNotification);
 
@@ -323,7 +323,7 @@ void StepGrid::paint (juce::Graphics& g)
     const int rowH = getHeight() / kNumPads;
     const int colW = getWidth() / kNumSteps;
     const auto& sequencer = processor.getSequencer();
-    const auto& pattern = sequencer.getCurrentPattern();
+    const auto pattern = sequencer.getCurrentPatternSnapshot(); // one locked copy, not a live reference
 
     for (int pad = 0; pad < kNumPads; ++pad)
     {
@@ -377,8 +377,7 @@ void StepGrid::mouseDown (const juce::MouseEvent& e)
     const int pad = juce::jlimit (0, kNumPads - 1, e.y / juce::jmax (1, rowH));
     const int step = juce::jlimit (0, kNumSteps - 1, e.x / juce::jmax (1, colW));
 
-    auto& stepData = processor.getSequencer().getCurrentPattern().tracks[(size_t) pad].steps[(size_t) step];
-    stepData.enabled = ! stepData.enabled;
+    processor.getSequencer().toggleStepEnabled (pad, step);
 
     if (onStepSelected)
         onStepSelected (pad, step);
@@ -396,7 +395,7 @@ TrackLengthColumn::TrackLengthColumn (SomeChopsAudioProcessor& p) : processor (p
         auto* label = lengthLabels.add (new juce::Label());
         addAndMakeVisible (label);
         label->setJustificationType (juce::Justification::centred);
-        label->setFont (juce::Font (11.0f));
+        label->setFont (juce::Font (juce::FontOptions (11.0f)));
         label->setColour (juce::Label::textColourId, juce::Colours::lightgrey);
         label->setText (juce::String (kNumSteps), juce::dontSendNotification);
 
@@ -474,7 +473,7 @@ SlicePitchRow::SlicePitchRow (SomeChopsAudioProcessor& p) : processor (p)
         auto* label = pitchLabels.add (new juce::Label());
         addAndMakeVisible (label);
         label->setJustificationType (juce::Justification::centred);
-        label->setFont (juce::Font (11.0f));
+        label->setFont (juce::Font (juce::FontOptions (11.0f)));
         label->setColour (juce::Label::textColourId, juce::Colours::lightgrey);
         label->setText ("+0.0st", juce::dontSendNotification);
 
@@ -574,7 +573,7 @@ namespace
 SettingsPanel::SettingsPanel (SomeChopsAudioProcessor& p) : processor (p)
 {
     addAndMakeVisible (title);
-    title.setFont (juce::Font (18.0f, juce::Font::bold));
+    title.setFont (juce::Font (juce::FontOptions (18.0f, juce::Font::bold)));
     title.setJustificationType (juce::Justification::centredLeft);
 
     auto setupNoteSlider = [this] (juce::Slider& s, juce::Label& label, juce::Label* noteName)
@@ -973,42 +972,26 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     stepRatchetSlider.onValueChange = [this]
     {
         if (selectedPad >= 0)
-            processor.getSequencer().getCurrentPattern().tracks[(size_t) selectedPad].steps[(size_t) selectedStep].ratchet
-                = (int) stepRatchetSlider.getValue();
+            processor.getSequencer().setStepRatchet (selectedPad, selectedStep, (int) stepRatchetSlider.getValue());
     };
     stepPitchSlider.onValueChange = [this]
     {
         if (selectedPad >= 0)
-            processor.getSequencer().getCurrentPattern().tracks[(size_t) selectedPad].steps[(size_t) selectedStep].pitchSemitones
-                = (float) stepPitchSlider.getValue();
+            processor.getSequencer().setStepPitch (selectedPad, selectedStep, (float) stepPitchSlider.getValue());
     };
     stepProbabilitySlider.onValueChange = [this]
     {
         if (selectedPad >= 0)
-            processor.getSequencer().getCurrentPattern().tracks[(size_t) selectedPad].steps[(size_t) selectedStep].probability
-                = (float) stepProbabilitySlider.getValue();
+            processor.getSequencer().setStepProbability (selectedPad, selectedStep, (float) stepProbabilitySlider.getValue());
     };
     stepNudgeSlider.onValueChange = [this]
     {
         if (selectedPad >= 0)
-            processor.getSequencer().getCurrentPattern().tracks[(size_t) selectedPad].steps[(size_t) selectedStep].nudge
-                = (float) stepNudgeSlider.getValue();
+            processor.getSequencer().setStepNudge (selectedPad, selectedStep, (float) stepNudgeSlider.getValue());
     };
 
     updateSelectedStepControls();
     updateSelectedSliceControls();
-}
-
-SomeChopsAudioProcessorEditor::~SomeChopsAudioProcessorEditor()
-{
-    // Clear callbacks to prevent access to neighboring editors that may have already been destroyed
-    sliceStartEditor.onFocusLost = nullptr;
-    sliceEndEditor.onFocusLost = nullptr;
-    slicePitchEditor.onFocusLost = nullptr;
-
-    sliceStartEditor.onReturnKey = nullptr;
-    sliceEndEditor.onReturnKey = nullptr;
-    slicePitchEditor.onReturnKey = nullptr;
 }
 
 void SomeChopsAudioProcessorEditor::refreshPatternSelector()
@@ -1033,7 +1016,7 @@ void SomeChopsAudioProcessorEditor::updateSelectedStepControls()
         return;
     }
 
-    auto& stepData = processor.getSequencer().getCurrentPattern().tracks[(size_t) selectedPad].steps[(size_t) selectedStep];
+    const auto stepData = processor.getSequencer().getStep (selectedPad, selectedStep);
     selectedStepLabel.setText ("Pad " + juce::String (selectedPad + 1) + " / Step " + juce::String (selectedStep + 1),
                                 juce::dontSendNotification);
     stepRatchetSlider.setValue (stepData.ratchet, juce::dontSendNotification);

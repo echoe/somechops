@@ -59,25 +59,22 @@ public:
     void setHostInfo (double bpm, bool isPlaying);
 
     // Advances the clock across a block and returns the hits that should fire within it.
+    // Called on the audio thread.
     std::vector<SequencerHit> processBlock (int numSamples);
 
     void setCurrentPatternIndex (int index);
-    int getCurrentPatternIndex() const { return currentPatternIndex; }
+    int getCurrentPatternIndex() const;
 
     // Requests a switch to a different pattern. If immediate, takes effect on the very
     // next processBlock call. If not, the switch is deferred until the current pattern
-    // finishes its 16 steps (i.e. the next time the step counter wraps to 0).
+    // finishes its 16 steps (i.e. the next time the step counter wraps to 0). Called from
+    // both the UI (pattern selector) and the audio thread (MIDI-triggered pattern switch).
     void requestPatternChange (int newIndex, bool immediate);
-    int getPendingPatternIndex() const { return pendingPatternIndex; }
+    int getPendingPatternIndex() const;
 
     // Resets the step/ratchet clock to the start of the pattern. Handy when a manual
     // play button (rather than host transport) starts the sequencer, for a clean count-in.
     void resetPosition();
-
-    Pattern& getPattern (int index) { return patterns[(size_t) juce::jlimit (0, kNumPatterns - 1, index)]; }
-    const Pattern& getPattern (int index) const { return patterns[(size_t) juce::jlimit (0, kNumPatterns - 1, index)]; }
-    Pattern& getCurrentPattern() { return patterns[(size_t) currentPatternIndex]; }
-    const Pattern& getCurrentPattern() const { return patterns[(size_t) currentPatternIndex]; }
 
     void randomizeTrack (int trackIndex, float density, float pitchRangeSemitones, int maxRatchet,
                          float nudgeRangePercent, bool randomizeLength);
@@ -85,7 +82,7 @@ public:
                               float nudgeRangePercent, bool randomizeLength);
     void clearPattern (int patternIndex);
 
-    int getCurrentStep() const { return currentStep; }
+    int getCurrentStep() const;
 
     // Per-lane step length (polymeter): each track can loop over fewer than kNumSteps
     // steps while all tracks stay locked to the same underlying tempo clock, so lanes
@@ -96,10 +93,27 @@ public:
     // Which step within its own (possibly shorter) loop a given track is currently on.
     int getCurrentTrackStep (int trackIndex) const;
 
-    void setStepsPerBeat (int steps) { stepsPerBeat = juce::jmax (1, steps); } // e.g. 4 = 16th notes at 4/4
+    void setStepsPerBeat (int steps); // e.g. 4 = 16th notes at 4/4
 
-    // For preset serialization
-    std::array<Pattern, kNumPatterns>& getAllPatterns() { return patterns; }
+    // --- Per-step data access, for the current pattern ---
+    // These replace direct reference access to Pattern/Track/StepData (which the UI used
+    // to mutate directly while the audio thread read the same data with no synchronization
+    // at all — the root cause of a real crash in DrumSampler that used the same pattern
+    // before it was fixed there). Every call here copies out or applies under the lock.
+    StepData getStep (int pad, int step) const;
+    void toggleStepEnabled (int pad, int step);
+    void setStepRatchet (int pad, int step, int ratchet);
+    void setStepPitch (int pad, int step, float pitch);
+    void setStepProbability (int pad, int step, float probability);
+    void setStepNudge (int pad, int step, float nudge);
+
+    // A full copy of the current pattern, for UI painting (e.g. the step grid) that needs
+    // to read many steps at once without locking per-cell.
+    Pattern getCurrentPatternSnapshot() const;
+
+    // For preset serialization: copies all 32 patterns out, or replaces them wholesale.
+    std::array<Pattern, kNumPatterns> getAllPatternsSnapshot() const;
+    void setAllPatterns (std::array<Pattern, kNumPatterns> newPatterns);
 
 private:
     std::array<Pattern, kNumPatterns> patterns;
@@ -125,5 +139,11 @@ private:
     // stored relative to the start of the block in which processBlock will next emit them.
     std::vector<std::pair<double, SequencerHit>> pendingHits;
 
-    void updateTiming();
+    // Guards `patterns` (and the playback-position state) against the audio thread
+    // (processBlock) and the message thread (step edits, randomize, pattern switching,
+    // preset load/save) touching them at the same time. `mutable` so const read-only
+    // methods can still lock. Re-entrant, so methods here can freely call each other.
+    mutable juce::CriticalSection lock;
+
+    void updateTiming(); // assumes `lock` is already held by the caller
 };

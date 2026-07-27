@@ -29,16 +29,16 @@ std::vector<int> TransientDetector::findOnsets (const juce::AudioBuffer<float>& 
     const int hop = settings.hopSize;
 
     juce::dsp::FFT fft (settings.fftOrder);
-    juce::dsp::WindowingFunction<float> window (fftSize, juce::dsp::WindowingFunction<float>::hann);
+    juce::dsp::WindowingFunction<float> window ((size_t) fftSize, juce::dsp::WindowingFunction<float>::hann);
 
     const int numFrames = std::max (0, (numSamples - fftSize) / hop + 1);
     if (numFrames < 2)
         return onsets;
 
-    std::vector<float> prevMag (fftSize / 2, 0.0f);
-    std::vector<float> flux (numFrames, 0.0f);
+    std::vector<float> prevMag ((size_t) (fftSize / 2), 0.0f);
+    std::vector<float> flux ((size_t) numFrames, 0.0f);
 
-    std::vector<float> fftBuffer (fftSize * 2, 0.0f);
+    std::vector<float> fftBuffer ((size_t) (fftSize * 2), 0.0f);
 
     for (int frame = 0; frame < numFrames; ++frame)
     {
@@ -48,7 +48,7 @@ std::vector<int> TransientDetector::findOnsets (const juce::AudioBuffer<float>& 
         for (int i = 0; i < fftSize; ++i)
             fftBuffer[(size_t) i] = data[start + i];
 
-        window.multiplyWithWindowingTable (fftBuffer.data(), fftSize);
+        window.multiplyWithWindowingTable (fftBuffer.data(), (size_t) fftSize);
         fft.performFrequencyOnlyForwardTransform (fftBuffer.data());
 
         float frameFlux = 0.0f;
@@ -66,7 +66,7 @@ std::vector<int> TransientDetector::findOnsets (const juce::AudioBuffer<float>& 
 
     // Adaptive threshold: local mean + sensitivity * local std, over a sliding window of frames.
     const int localWindow = 8; // frames either side
-    std::vector<float> threshold (numFrames, 0.0f);
+    std::vector<float> threshold ((size_t) numFrames, 0.0f);
 
     for (int i = 0; i < numFrames; ++i)
     {

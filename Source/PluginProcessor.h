@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "DrumSampler.h"
 #include "Sequencer.h"
@@ -13,6 +14,12 @@ public:
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
+
+    // Overriding only the float version hides AudioProcessor's double overload from name
+    // lookup, which -Woverloaded-virtual warns about; this brings it back into scope.
+    // We don't actually support double-precision processing (no AudioProcessor::
+    // supportsDoublePrecisionProcessing() override), so it's never called in practice.
+    using AudioProcessor::processBlock;
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
@@ -43,13 +50,19 @@ public:
     // The sequencer runs whenever the host transport is playing OR the manual
     // play/stop button in the editor has been pressed (needed for standalone /
     // when the host doesn't report a play state, or for auditioning without
-    // starting the whole DAW transport).
-    bool manualPlayActive = false;
-    double currentBpmForSave = 120.0;
+    // starting the whole DAW transport). Atomic: written by both the UI thread
+    // (Play/Stop button) and the audio thread (MIDI start/stop notes).
+    std::atomic<bool> manualPlayActive { false };
+
+    // Atomic: written on the audio thread every block, read on the UI thread
+    // (Save Preset button, and indirectly via getStateInformation).
+    std::atomic<double> currentBpmForSave { 120.0 };
 
     // Used when the host doesn't report a tempo (e.g. standalone), or as the tempo the
     // editor's BPM slider controls. Host tempo, when available, still takes priority.
-    double manualBpm = 120.0;
+    // Atomic: written on the UI thread (BPM slider, preset load), read every block on
+    // the audio thread.
+    std::atomic<double> manualBpm { 120.0 };
 
     // Configurable MIDI note assignments for pads, pattern switching, and start/stop —
     // editable from the settings page.

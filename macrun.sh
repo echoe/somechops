@@ -1,1 +1,1 @@
-open build/SomeChops_Artefacts/Release/Standalone/SomeChops.app
+open build/SomeChops_artefacts/Release/Standalone/SomeChops.app

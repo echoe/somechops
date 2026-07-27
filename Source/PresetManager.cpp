@@ -9,17 +9,30 @@ juce::String PresetManager::encodeSampleAsBase64Wav (const juce::AudioBuffer<flo
 {
     juce::MemoryBlock mb;
     {
-        juce::MemoryOutputStream mos (mb, false);
+        // AudioFormatWriter takes ownership of the stream passed to createWriterFor() and
+        // deletes it in its own destructor — so this must be heap-allocated, not a stack
+        // object. (A previous version passed the address of a stack-allocated
+        // MemoryOutputStream here, which crashed — reliably, on preset save/getStateInformation,
+        // e.g. whenever the standalone window closes with a sample loaded — because the
+        // writer's destructor called `delete` on a stack address.)
+        auto* mos = new juce::MemoryOutputStream (mb, false);
         juce::WavAudioFormat wavFormat;
         std::unique_ptr<juce::AudioFormatWriter> writer (
-            wavFormat.createWriterFor (&mos, sampleRate, (unsigned int) buffer.getNumChannels(), 24, {}, 0));
+            wavFormat.createWriterFor (mos, sampleRate, (unsigned int) buffer.getNumChannels(), 24, {}, 0));
 
         if (writer != nullptr)
         {
             writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
             writer->flush();
-            // Writer must be destroyed before the MemoryOutputStream's data is finalized/read safely.
+            // Writer must be destroyed before the MemoryOutputStream's data is finalized/read
+            // safely. Destroying it also deletes `mos`, since the writer owns it.
             writer.reset();
+        }
+        else
+        {
+            // createWriterFor() only takes ownership on success; if it failed, `mos` was
+            // never adopted by anything, so we're still responsible for it.
+            delete mos;
         }
     }
 
@@ -88,7 +101,7 @@ std::unique_ptr<juce::XmlElement> PresetManager::buildXml (DrumSampler& sampler,
 
     // --- Sequencer patterns ---
     auto* patternsEl = root->createNewChildElement ("Patterns");
-    auto& allPatterns = sequencer.getAllPatterns();
+    auto allPatterns = sequencer.getAllPatternsSnapshot(); // locked copy, not a live reference
     for (int p = 0; p < kNumPatterns; ++p)
     {
         auto* patternEl = patternsEl->createNewChildElement ("Pattern");
@@ -170,7 +183,12 @@ bool PresetManager::applyXml (const juce::XmlElement& root, DrumSampler& sampler
 
     if (auto* patternsEl = root.getChildByName ("Patterns"))
     {
-        auto& allPatterns = sequencer.getAllPatterns();
+        // Start from the current live patterns (so any pattern index not present in this
+        // XML keeps its existing data), mutate a local copy, then commit it all at once
+        // via setAllPatterns() — never holding a direct mutable reference into the
+        // sequencer's own data while we're still reading/parsing XML.
+        auto allPatterns = sequencer.getAllPatternsSnapshot();
+
         for (auto* patternEl : patternsEl->getChildWithTagNameIterator ("Pattern"))
         {
             const int p = patternEl->getIntAttribute ("index", -1);
@@ -225,6 +243,8 @@ bool PresetManager::applyXml (const juce::XmlElement& root, DrumSampler& sampler
                 }
             }
         }
+
+        sequencer.setAllPatterns (std::move (allPatterns));
     }
 
     return true;

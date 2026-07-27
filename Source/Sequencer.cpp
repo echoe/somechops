@@ -10,12 +10,14 @@ Sequencer::Sequencer()
 
 void Sequencer::prepare (double sr)
 {
+    const juce::ScopedLock sl (lock);
     sampleRate = sr;
     updateTiming();
 }
 
 void Sequencer::setHostInfo (double newBpm, bool isPlaying)
 {
+    const juce::ScopedLock sl (lock);
     if (newBpm > 0.0)
         bpm = newBpm;
     playing = isPlaying;
@@ -32,14 +34,29 @@ void Sequencer::updateTiming()
         samplesPerStep = 1.0;
 }
 
+void Sequencer::setStepsPerBeat (int steps)
+{
+    const juce::ScopedLock sl (lock);
+    stepsPerBeat = juce::jmax (1, steps);
+    updateTiming();
+}
+
 void Sequencer::setCurrentPatternIndex (int index)
 {
+    const juce::ScopedLock sl (lock);
     currentPatternIndex = juce::jlimit (0, kNumPatterns - 1, index);
     pendingPatternIndex = -1;
 }
 
+int Sequencer::getCurrentPatternIndex() const
+{
+    const juce::ScopedLock sl (lock);
+    return currentPatternIndex;
+}
+
 void Sequencer::requestPatternChange (int newIndex, bool immediate)
 {
+    const juce::ScopedLock sl (lock);
     newIndex = juce::jlimit (0, kNumPatterns - 1, newIndex);
 
     if (immediate)
@@ -53,8 +70,15 @@ void Sequencer::requestPatternChange (int newIndex, bool immediate)
     }
 }
 
+int Sequencer::getPendingPatternIndex() const
+{
+    const juce::ScopedLock sl (lock);
+    return pendingPatternIndex;
+}
+
 void Sequencer::resetPosition()
 {
+    const juce::ScopedLock sl (lock);
     currentStep = -1; // so the next processBlock wraps to step 0
     trackStep.fill (-1);
     stepPhase = 0.0;
@@ -63,11 +87,13 @@ void Sequencer::resetPosition()
 
 void Sequencer::setTrackNumSteps (int trackIndex, int newNumSteps)
 {
+    const juce::ScopedLock sl (lock);
+
     if (trackIndex < 0 || trackIndex >= kNumPads)
         return;
 
     newNumSteps = juce::jlimit (1, kNumSteps, newNumSteps);
-    getCurrentPattern().tracks[(size_t) trackIndex].numSteps = newNumSteps;
+    patterns[(size_t) currentPatternIndex].tracks[(size_t) trackIndex].numSteps = newNumSteps;
 
     // If the lane just got shorter than where its playhead currently sits, wrap it
     // back into range immediately rather than waiting for the next natural wrap.
@@ -78,20 +104,30 @@ void Sequencer::setTrackNumSteps (int trackIndex, int newNumSteps)
 
 int Sequencer::getTrackNumSteps (int trackIndex) const
 {
+    const juce::ScopedLock sl (lock);
     if (trackIndex < 0 || trackIndex >= kNumPads)
         return kNumSteps;
-    return getCurrentPattern().tracks[(size_t) trackIndex].numSteps;
+    return patterns[(size_t) currentPatternIndex].tracks[(size_t) trackIndex].numSteps;
 }
 
 int Sequencer::getCurrentTrackStep (int trackIndex) const
 {
+    const juce::ScopedLock sl (lock);
     if (trackIndex < 0 || trackIndex >= kNumPads)
         return -1;
     return trackStep[(size_t) trackIndex];
 }
 
+int Sequencer::getCurrentStep() const
+{
+    const juce::ScopedLock sl (lock);
+    return currentStep;
+}
+
 void Sequencer::clearPattern (int patternIndex)
 {
+    const juce::ScopedLock sl (lock);
+
     if (patternIndex < 0 || patternIndex >= kNumPatterns)
         return;
 
@@ -103,6 +139,8 @@ void Sequencer::clearPattern (int patternIndex)
 void Sequencer::randomizeTrack (int trackIndex, float density, float pitchRangeSemitones, int maxRatchet,
                                  float nudgeRangePercent, bool randomizeLength)
 {
+    const juce::ScopedLock sl (lock);
+
     if (trackIndex < 0 || trackIndex >= kNumPads)
         return;
 
@@ -111,7 +149,7 @@ void Sequencer::randomizeTrack (int trackIndex, float density, float pitchRangeS
     std::uniform_real_distribution<float> nudgeDist (-nudgeRangePercent, nudgeRangePercent);
     std::uniform_int_distribution<int> ratchetDist (1, juce::jmax (1, maxRatchet));
 
-    auto& track = getCurrentPattern().tracks[(size_t) trackIndex];
+    auto& track = patterns[(size_t) currentPatternIndex].tracks[(size_t) trackIndex];
     for (auto& step : track.steps)
     {
         step.enabled = unit (rng) < density;
@@ -126,19 +164,97 @@ void Sequencer::randomizeTrack (int trackIndex, float density, float pitchRangeS
         // 4..kNumSteps rather than 1..kNumSteps — avoids absurdly short 1-2 step loops
         // that would rarely be musically useful, while still giving real polymeter variety.
         std::uniform_int_distribution<int> lengthDist (4, kNumSteps);
-        setTrackNumSteps (trackIndex, lengthDist (rng));
+        const int newLen = lengthDist (rng);
+        track.numSteps = newLen;
+
+        auto& ts = trackStep[(size_t) trackIndex];
+        if (ts >= newLen)
+            ts = ts % newLen;
     }
 }
 
 void Sequencer::randomizeAllTracks (float density, float pitchRangeSemitones, int maxRatchet,
                                      float nudgeRangePercent, bool randomizeLength)
 {
+    // Locking once for the whole batch (rather than once per track inside randomizeTrack)
+    // isn't required for correctness — CriticalSection is re-entrant — but avoids 12
+    // separate lock/unlock round trips for what's conceptually one user action.
+    const juce::ScopedLock sl (lock);
     for (int t = 0; t < kNumPads; ++t)
         randomizeTrack (t, density, pitchRangeSemitones, maxRatchet, nudgeRangePercent, randomizeLength);
 }
 
+StepData Sequencer::getStep (int pad, int step) const
+{
+    const juce::ScopedLock sl (lock);
+    if (pad < 0 || pad >= kNumPads || step < 0 || step >= kNumSteps)
+        return {};
+    return patterns[(size_t) currentPatternIndex].tracks[(size_t) pad].steps[(size_t) step];
+}
+
+void Sequencer::toggleStepEnabled (int pad, int step)
+{
+    const juce::ScopedLock sl (lock);
+    if (pad < 0 || pad >= kNumPads || step < 0 || step >= kNumSteps)
+        return;
+    auto& s = patterns[(size_t) currentPatternIndex].tracks[(size_t) pad].steps[(size_t) step];
+    s.enabled = ! s.enabled;
+}
+
+void Sequencer::setStepRatchet (int pad, int step, int ratchet)
+{
+    const juce::ScopedLock sl (lock);
+    if (pad < 0 || pad >= kNumPads || step < 0 || step >= kNumSteps)
+        return;
+    patterns[(size_t) currentPatternIndex].tracks[(size_t) pad].steps[(size_t) step].ratchet = ratchet;
+}
+
+void Sequencer::setStepPitch (int pad, int step, float pitch)
+{
+    const juce::ScopedLock sl (lock);
+    if (pad < 0 || pad >= kNumPads || step < 0 || step >= kNumSteps)
+        return;
+    patterns[(size_t) currentPatternIndex].tracks[(size_t) pad].steps[(size_t) step].pitchSemitones = pitch;
+}
+
+void Sequencer::setStepProbability (int pad, int step, float probability)
+{
+    const juce::ScopedLock sl (lock);
+    if (pad < 0 || pad >= kNumPads || step < 0 || step >= kNumSteps)
+        return;
+    patterns[(size_t) currentPatternIndex].tracks[(size_t) pad].steps[(size_t) step].probability = probability;
+}
+
+void Sequencer::setStepNudge (int pad, int step, float nudge)
+{
+    const juce::ScopedLock sl (lock);
+    if (pad < 0 || pad >= kNumPads || step < 0 || step >= kNumSteps)
+        return;
+    patterns[(size_t) currentPatternIndex].tracks[(size_t) pad].steps[(size_t) step].nudge = nudge;
+}
+
+Pattern Sequencer::getCurrentPatternSnapshot() const
+{
+    const juce::ScopedLock sl (lock);
+    return patterns[(size_t) currentPatternIndex];
+}
+
+std::array<Pattern, kNumPatterns> Sequencer::getAllPatternsSnapshot() const
+{
+    const juce::ScopedLock sl (lock);
+    return patterns;
+}
+
+void Sequencer::setAllPatterns (std::array<Pattern, kNumPatterns> newPatterns)
+{
+    const juce::ScopedLock sl (lock);
+    patterns = std::move (newPatterns);
+}
+
 std::vector<SequencerHit> Sequencer::processBlock (int numSamples)
 {
+    const juce::ScopedLock sl (lock);
+
     std::vector<SequencerHit> output;
     if (! playing || samplesPerStep <= 0.0)
         return output;
@@ -186,7 +302,7 @@ std::vector<SequencerHit> Sequencer::processBlock (int numSamples)
             }
 
             std::uniform_real_distribution<float> unit (0.0f, 1.0f);
-            auto& pattern = getCurrentPattern();
+            auto& pattern = patterns[(size_t) currentPatternIndex];
 
             for (int pad = 0; pad < kNumPads; ++pad)
             {
