@@ -999,6 +999,18 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     updateSelectedSliceControls();
 }
 
+SomeChopsAudioProcessorEditor::~SomeChopsAudioProcessorEditor()
+{
+    // Clear callbacks to prevent access to neighboring editors that may have already been destroyed
+    sliceStartEditor.onFocusLost = nullptr;
+    sliceEndEditor.onFocusLost = nullptr;
+    slicePitchEditor.onFocusLost = nullptr;
+
+    sliceStartEditor.onReturnKey = nullptr;
+    sliceEndEditor.onReturnKey = nullptr;
+    slicePitchEditor.onReturnKey = nullptr;
+}
+
 void SomeChopsAudioProcessorEditor::refreshPatternSelector()
 {
     patternSelector.clear (juce::dontSendNotification);
