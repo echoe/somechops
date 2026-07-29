@@ -9,30 +9,26 @@ juce::String PresetManager::encodeSampleAsBase64Wav (const juce::AudioBuffer<flo
 {
     juce::MemoryBlock mb;
     {
-        // AudioFormatWriter takes ownership of the stream passed to createWriterFor() and
-        // deletes it in its own destructor — so this must be heap-allocated, not a stack
-        // object. (A previous version passed the address of a stack-allocated
-        // MemoryOutputStream here, which crashed — reliably, on preset save/getStateInformation,
-        // e.g. whenever the standalone window closes with a sample loaded — because the
-        // writer's destructor called `delete` on a stack address.)
-        auto* mos = new juce::MemoryOutputStream (mb, false);
-        juce::WavAudioFormat wavFormat;
-        std::unique_ptr<juce::AudioFormatWriter> writer (
-            wavFormat.createWriterFor (mos, sampleRate, (unsigned int) buffer.getNumChannels(), 24, {}, 0));
+        // The current createWriterFor() takes ownership via a std::unique_ptr<OutputStream>&:
+        // on success it moves the stream into the writer and clears our unique_ptr; on
+        // failure it leaves our unique_ptr untouched, so it's freed normally when this
+        // scope ends either way — unlike the older raw-pointer overload this replaces,
+        // there's no manual new/delete bookkeeping needed here any more.
+        std::unique_ptr<juce::OutputStream> mos (std::make_unique<juce::MemoryOutputStream> (mb, false));
 
-        if (writer != nullptr)
+        juce::WavAudioFormat wavFormat;
+        const auto writerOptions = juce::AudioFormatWriterOptions()
+                                       .withSampleRate (sampleRate)
+                                       .withNumChannels (buffer.getNumChannels())
+                                       .withBitsPerSample (24);
+
+        if (auto writer = wavFormat.createWriterFor (mos, writerOptions))
         {
             writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
             writer->flush();
-            // Writer must be destroyed before the MemoryOutputStream's data is finalized/read
-            // safely. Destroying it also deletes `mos`, since the writer owns it.
+            // Writer (and the stream it now owns) must be destroyed before the
+            // MemoryOutputStream's data is finalized/read safely below.
             writer.reset();
-        }
-        else
-        {
-            // createWriterFor() only takes ownership on success; if it failed, `mos` was
-            // never adopted by anything, so we're still responsible for it.
-            delete mos;
         }
     }
 
