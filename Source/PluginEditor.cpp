@@ -768,6 +768,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     sensitivitySlider.setRange (0.5, 4.0, 0.05);
     sensitivitySlider.setValue (1.5);
     sensitivitySlider.setSliderStyle (juce::Slider::LinearHorizontal);
+    sensitivitySlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 35, 20);
 
     bpmSlider.setRange (40.0, 300.0, 1.0);
     bpmSlider.setValue (processor.manualBpm, juce::dontSendNotification);
@@ -777,18 +778,22 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     densitySlider.setRange (0.0, 1.0, 0.01);
     densitySlider.setValue (0.5);
     densitySlider.setSliderStyle (juce::Slider::LinearHorizontal);
+    densitySlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 45, 20);
 
     pitchRangeSlider.setRange (0.0, 24.0, 1.0);
     pitchRangeSlider.setValue (12.0);
     pitchRangeSlider.setSliderStyle (juce::Slider::LinearHorizontal);
+    pitchRangeSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 45, 20);
 
     maxRatchetSlider.setRange (1.0, 8.0, 1.0);
     maxRatchetSlider.setValue (4.0);
     maxRatchetSlider.setSliderStyle (juce::Slider::LinearHorizontal);
+    maxRatchetSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 45, 20);
 
     nudgeRangeSlider.setRange (0.0, 50.0, 1.0);
     nudgeRangeSlider.setValue (0.0);
     nudgeRangeSlider.setSliderStyle (juce::Slider::LinearHorizontal);
+    nudgeRangeSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 45, 20);
 
     // Ratchet/probability made longer with visible text boxes so exact values are easy to read.
     stepRatchetSlider.setRange (1.0, 8.0, 1.0);
