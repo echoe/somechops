@@ -84,9 +84,9 @@ public:
     // play button (rather than host transport) starts the sequencer, for a clean count-in.
     void resetPosition();
 
-    void randomizeTrack (int trackIndex, float density, float pitchRangeSemitones, int maxRatchet,
+    void randomizeTrack (int trackIndex, float density, float pitchRangeSemitones,
                          float nudgeRangePercent, bool randomizeLength);
-    void randomizeAllTracks (float density, float pitchRangeSemitones, int maxRatchet,
+    void randomizeAllTracks (float density, float pitchRangeSemitones,
                               float nudgeRangePercent, bool randomizeLength);
     void clearPattern (int patternIndex);
 

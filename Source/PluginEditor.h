@@ -118,7 +118,22 @@ private:
 };
 
 //==============================================================================
-// One vertical stack of small sliders, one per pad/track, sitting to the left of
+// One row of plain "Slice N" labels, one per pad, sitting to the left of the step
+// grid so it's obvious at a glance which slice each row belongs to. Purely static —
+// these are just row numbers (1..kNumPads), not the sample's own per-slice names
+// (see PadGrid for those).
+class SliceNumberColumn : public juce::Component
+{
+public:
+    SliceNumberColumn();
+    void resized() override;
+
+private:
+    juce::OwnedArray<juce::Label> sliceLabels;
+};
+
+//==============================================================================
+// One vertical stack of small sliders, one per pad/track, sitting to the right of
 // the step grid — sets each lane's own step count (1..16). Lanes shorter than
 // 16 loop independently against the others (polymeter) while staying locked to
 // the same tempo clock.
@@ -228,12 +243,13 @@ private:
     juce::TextButton clearButton { "Clear Pattern" };
     juce::ToggleButton quantizePatternChangeToggle { "Wait for pattern end" };
     juce::ToggleButton resetPatternOnChangeToggle { "Reset steps on pattern change" };
-    juce::Slider densitySlider, pitchRangeSlider, maxRatchetSlider, nudgeRangeSlider;
-    juce::Label densityLabel { {}, "Density" }, pitchRangeLabel { {}, "Pitch Range" }, maxRatchetLabel { {}, "Max Ratchet" },
+    juce::Slider densitySlider, pitchRangeSlider, nudgeRangeSlider;
+    juce::Label densityLabel { {}, "Density" }, pitchRangeLabel { {}, "Pitch Range" },
                 nudgeRangeLabel { {}, "Nudge Range" };
     juce::ToggleButton randomizeLengthsToggle { "Randomize Lane Lengths" };
 
     StepGrid stepGrid;
+    SliceNumberColumn sliceNumberColumn;
     TrackLengthColumn trackLengthColumn;
 
     // Selected-step editor
@@ -252,8 +268,17 @@ private:
     juce::TextEditor sliceStartEditor, sliceEndEditor, slicePitchEditor, sliceChokeGroupEditor;
     int selectedSlice = -1;
 
+    // Bulk-assigns choke group 1 to every currently loaded slice in one click — setting
+    // it slice-by-slice via sliceChokeGroupEditor is tedious for a whole kit that should
+    // all choke together (e.g. every hi-hat variation you've got sliced out).
+    juce::TextButton chokeGroupAllButton { "Choke Group All (1)" };
+
     std::unique_ptr<juce::FileChooser> fileChooser;
     SettingsPanel settingsPanel;
+
+    // A thin horizontal rule between the per-slice controls above and the sequencer
+    // controls below, drawn in paint() at whatever bounds resized() last computed.
+    juce::Rectangle<int> sliceSequencerDividerBounds;
 
     void updateSelectedStepControls();
     void updateSelectedSliceControls();

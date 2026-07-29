@@ -391,6 +391,28 @@ void StepGrid::mouseDown (const juce::MouseEvent& e)
 //==============================================================================
 // TrackLengthColumn
 //==============================================================================
+SliceNumberColumn::SliceNumberColumn()
+{
+    for (int i = 0; i < kNumPads; ++i)
+    {
+        auto* label = sliceLabels.add (new juce::Label());
+        addAndMakeVisible (label);
+        label->setJustificationType (juce::Justification::centredLeft);
+        label->setFont (juce::Font (juce::FontOptions (11.0f)));
+        label->setText ("Slice " + juce::String (i + 1), juce::dontSendNotification);
+    }
+}
+
+void SliceNumberColumn::resized()
+{
+    auto bounds = getLocalBounds();
+    const int rowH = bounds.getHeight() / kNumPads;
+
+    for (int i = 0; i < sliceLabels.size(); ++i)
+        sliceLabels[i]->setBounds (bounds.withY (bounds.getY() + i * rowH).withHeight (rowH - 2));
+}
+
+//==============================================================================
 TrackLengthColumn::TrackLengthColumn (SomeChopsAudioProcessor& p) : processor (p)
 {
     for (int i = 0; i < kNumPads; ++i)
@@ -741,6 +763,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     addAndMakeVisible (slicePitchEditor);
     addAndMakeVisible (sliceChokeGroupFieldLabel);
     addAndMakeVisible (sliceChokeGroupEditor);
+    addAndMakeVisible (chokeGroupAllButton);
     addAndMakeVisible (patternSelector);
     addAndMakeVisible (randomizeButton);
     addAndMakeVisible (clearButton);
@@ -750,12 +773,11 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     addAndMakeVisible (densityLabel);
     addAndMakeVisible (pitchRangeSlider);
     addAndMakeVisible (pitchRangeLabel);
-    addAndMakeVisible (maxRatchetSlider);
-    addAndMakeVisible (maxRatchetLabel);
     addAndMakeVisible (nudgeRangeSlider);
     addAndMakeVisible (nudgeRangeLabel);
     addAndMakeVisible (randomizeLengthsToggle);
     addAndMakeVisible (stepGrid);
+    addAndMakeVisible (sliceNumberColumn);
     addAndMakeVisible (trackLengthColumn);
     addAndMakeVisible (selectedStepLabel);
     addAndMakeVisible (stepRatchetSlider);
@@ -786,11 +808,6 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     pitchRangeSlider.setValue (12.0);
     pitchRangeSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     pitchRangeSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 45, 20);
-
-    maxRatchetSlider.setRange (1.0, 8.0, 1.0);
-    maxRatchetSlider.setValue (4.0);
-    maxRatchetSlider.setSliderStyle (juce::Slider::LinearHorizontal);
-    maxRatchetSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 45, 20);
 
     nudgeRangeSlider.setRange (0.0, 50.0, 1.0);
     nudgeRangeSlider.setValue (0.0);
@@ -993,7 +1010,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     randomizeButton.onClick = [this]
     {
         audioProcessor.getSequencer().randomizeAllTracks ((float) densitySlider.getValue(),
-            (float) pitchRangeSlider.getValue(), (int) maxRatchetSlider.getValue(),
+            (float) pitchRangeSlider.getValue(),
             (float) nudgeRangeSlider.getValue(), randomizeLengthsToggle.getToggleState());
         stepGrid.repaint();
     };
@@ -1002,6 +1019,15 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     {
         audioProcessor.getSequencer().clearPattern (audioProcessor.getSequencer().getCurrentPatternIndex());
         stepGrid.repaint();
+    };
+
+    chokeGroupAllButton.onClick = [this]
+    {
+        auto& sampler = audioProcessor.getSampler();
+        for (int i = 0; i < sampler.getNumSlices(); ++i)
+            sampler.setSliceChokeGroup (i, 1);
+
+        updateSelectedSliceControls(); // refresh the field if the selected slice is one of these
     };
 
     stepGrid.onStepSelected = [this] (int pad, int step)
@@ -1108,6 +1134,9 @@ void SomeChopsAudioProcessorEditor::updateSelectedSliceControls()
 void SomeChopsAudioProcessorEditor::paint (juce::Graphics& g)
 {
     g.fillAll (findColour (juce::ResizableWindow::backgroundColourId));
+
+    g.setColour (findColour (panelBorderColourId));
+    g.fillRect (sliceSequencerDividerBounds);
 }
 
 void SomeChopsAudioProcessorEditor::resized()
@@ -1169,9 +1198,15 @@ void SomeChopsAudioProcessorEditor::resized()
     sliceEditorBar.removeFromLeft (14);
     sliceChokeGroupFieldLabel.setBounds (sliceEditorBar.removeFromLeft (150));
     sliceChokeGroupEditor.setBounds (sliceEditorBar.removeFromLeft (50));
+    sliceEditorBar.removeFromLeft (14);
+    chokeGroupAllButton.setBounds (sliceEditorBar.removeFromLeft (160));
+
+    // Divider between the per-slice controls above and the sequencer controls below.
+    r.removeFromTop (10);
+    sliceSequencerDividerBounds = r.removeFromTop (2);
+    r.removeFromTop (8);
 
     // Pattern selection/switching controls on their own row...
-    r.removeFromTop (8);
     auto patternBar = r.removeFromTop (28);
     patternSelector.setBounds (patternBar.removeFromLeft (120));
     patternBar.removeFromLeft (10);
@@ -1179,7 +1214,7 @@ void SomeChopsAudioProcessorEditor::resized()
     patternBar.removeFromLeft (10);
     resetPatternOnChangeToggle.setBounds (patternBar.removeFromLeft (220));
 
-    // ...and randomization gets its own two rows below, so its sliders can be much longer.
+    // Randomization controls all on one row.
     r.removeFromTop (6);
     auto randomizeBar = r.removeFromTop (28);
     randomizeButton.setBounds (randomizeBar.removeFromLeft (110));
@@ -1187,45 +1222,38 @@ void SomeChopsAudioProcessorEditor::resized()
     clearButton.setBounds (randomizeBar.removeFromLeft (100));
     randomizeBar.removeFromLeft (14);
     densityLabel.setBounds (randomizeBar.removeFromLeft (55));
-    densitySlider.setBounds (randomizeBar.removeFromLeft (220));
+    densitySlider.setBounds (randomizeBar.removeFromLeft (150));
     randomizeBar.removeFromLeft (14);
     pitchRangeLabel.setBounds (randomizeBar.removeFromLeft (85));
-    pitchRangeSlider.setBounds (randomizeBar.removeFromLeft (220));
+    pitchRangeSlider.setBounds (randomizeBar.removeFromLeft (150));
     randomizeBar.removeFromLeft (14);
-    maxRatchetLabel.setBounds (randomizeBar.removeFromLeft (85));
-    maxRatchetSlider.setBounds (randomizeBar.removeFromLeft (220));
+    nudgeRangeLabel.setBounds (randomizeBar.removeFromLeft (85));
+    nudgeRangeSlider.setBounds (randomizeBar.removeFromLeft (150));
+    randomizeBar.removeFromLeft (14);
+    randomizeLengthsToggle.setBounds (randomizeBar.removeFromLeft (200));
 
     r.removeFromTop (6);
-    auto randomizeBar2 = r.removeFromTop (28);
-    randomizeBar2.removeFromLeft (214); // align under randomizeBar's sliders, past the two buttons
-    nudgeRangeLabel.setBounds (randomizeBar2.removeFromLeft (85));
-    nudgeRangeSlider.setBounds (randomizeBar2.removeFromLeft (220));
-    randomizeBar2.removeFromLeft (14);
-    randomizeLengthsToggle.setBounds (randomizeBar2.removeFromLeft (220));
+    auto stepEditorRow = r.removeFromBottom (28); // label + Ratchet + Pitch + Probability + Nudge, all on one line
 
-    r.removeFromTop (6);
-    auto stepEditorRow2 = r.removeFromBottom (28); // Probability + Nudge
-    r.removeFromBottom (4);
-    auto stepEditorRow1 = r.removeFromBottom (28); // label + Ratchet + Pitch
-
-    selectedStepLabel.setBounds (stepEditorRow1.removeFromLeft (150));
-    stepEditorRow1.removeFromLeft (6);
+    selectedStepLabel.setBounds (stepEditorRow.removeFromLeft (150));
+    stepEditorRow.removeFromLeft (6);
     // Ratchet/Pitch/Probability/Nudge sliders all kept the same width, per request.
-    stepRatchetLabel.setBounds (stepEditorRow1.removeFromLeft (55));
-    stepRatchetSlider.setBounds (stepEditorRow1.removeFromLeft (260));
-    stepEditorRow1.removeFromLeft (12);
-    stepPitchLabel.setBounds (stepEditorRow1.removeFromLeft (45));
-    stepPitchSlider.setBounds (stepEditorRow1.removeFromLeft (260));
-
-    stepEditorRow2.removeFromLeft (156); // align under row 1's sliders, past where the label sat
-    stepProbLabel.setBounds (stepEditorRow2.removeFromLeft (75));
-    stepProbabilitySlider.setBounds (stepEditorRow2.removeFromLeft (260));
-    stepEditorRow2.removeFromLeft (12);
-    stepNudgeLabel.setBounds (stepEditorRow2.removeFromLeft (55));
-    stepNudgeSlider.setBounds (stepEditorRow2.removeFromLeft (260));
+    stepRatchetLabel.setBounds (stepEditorRow.removeFromLeft (55));
+    stepRatchetSlider.setBounds (stepEditorRow.removeFromLeft (185));
+    stepEditorRow.removeFromLeft (12);
+    stepPitchLabel.setBounds (stepEditorRow.removeFromLeft (45));
+    stepPitchSlider.setBounds (stepEditorRow.removeFromLeft (185));
+    stepEditorRow.removeFromLeft (12);
+    stepProbLabel.setBounds (stepEditorRow.removeFromLeft (75));
+    stepProbabilitySlider.setBounds (stepEditorRow.removeFromLeft (185));
+    stepEditorRow.removeFromLeft (12);
+    stepNudgeLabel.setBounds (stepEditorRow.removeFromLeft (55));
+    stepNudgeSlider.setBounds (stepEditorRow.removeFromLeft (185));
 
     r.removeFromBottom (6);
-    trackLengthColumn.setBounds (r.removeFromLeft (110));
+    sliceNumberColumn.setBounds (r.removeFromLeft (70));
     r.removeFromLeft (4);
+    trackLengthColumn.setBounds (r.removeFromRight (110));
+    r.removeFromRight (4);
     stepGrid.setBounds (r);
 }

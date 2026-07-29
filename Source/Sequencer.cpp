@@ -155,7 +155,7 @@ void Sequencer::clearPattern (int patternIndex)
             step = StepData {};
 }
 
-void Sequencer::randomizeTrack (int trackIndex, float density, float pitchRangeSemitones, int maxRatchet,
+void Sequencer::randomizeTrack (int trackIndex, float density, float pitchRangeSemitones,
                                  float nudgeRangePercent, bool randomizeLength)
 {
     const juce::ScopedLock sl (lock);
@@ -166,14 +166,13 @@ void Sequencer::randomizeTrack (int trackIndex, float density, float pitchRangeS
     std::uniform_real_distribution<float> unit (0.0f, 1.0f);
     std::uniform_real_distribution<float> pitchDist (-pitchRangeSemitones, pitchRangeSemitones);
     std::uniform_real_distribution<float> nudgeDist (-nudgeRangePercent, nudgeRangePercent);
-    std::uniform_int_distribution<int> ratchetDist (1, juce::jmax (1, maxRatchet));
 
     auto& track = patterns[(size_t) currentPatternIndex].tracks[(size_t) trackIndex];
     for (auto& step : track.steps)
     {
         step.enabled = unit (rng) < density;
         step.pitchSemitones = step.enabled ? pitchDist (rng) : 0.0f;
-        step.ratchet = step.enabled ? ratchetDist (rng) : 1;
+        step.ratchet = 1; // randomize no longer touches ratchet — set/edited only by hand per-step
         step.probability = step.enabled ? juce::jmap (unit (rng), 0.0f, 1.0f, 60.0f, 100.0f) : 100.0f;
         step.nudge = step.enabled ? nudgeDist (rng) : 0.0f;
     }
@@ -192,7 +191,7 @@ void Sequencer::randomizeTrack (int trackIndex, float density, float pitchRangeS
     }
 }
 
-void Sequencer::randomizeAllTracks (float density, float pitchRangeSemitones, int maxRatchet,
+void Sequencer::randomizeAllTracks (float density, float pitchRangeSemitones,
                                      float nudgeRangePercent, bool randomizeLength)
 {
     // Locking once for the whole batch (rather than once per track inside randomizeTrack)
@@ -200,7 +199,7 @@ void Sequencer::randomizeAllTracks (float density, float pitchRangeSemitones, in
     // separate lock/unlock round trips for what's conceptually one user action.
     const juce::ScopedLock sl (lock);
     for (int t = 0; t < kNumPads; ++t)
-        randomizeTrack (t, density, pitchRangeSemitones, maxRatchet, nudgeRangePercent, randomizeLength);
+        randomizeTrack (t, density, pitchRangeSemitones, nudgeRangePercent, randomizeLength);
 }
 
 StepData Sequencer::getStep (int pad, int step) const
