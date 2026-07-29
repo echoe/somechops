@@ -15,7 +15,7 @@ This entire plugin is basically based off of my memory of having the Teenage Eng
 
 ## Status
 
-While this plugin technically works, it still crashes when I close the plugin, and crashes when I attempt to save a preset ... so I have this as an alpha for now and am not building/releasing it yet. I'll build and release when it's stabler [hopefully]. There is also still some weirdness when manually adjusting the slice points via slider.
+Mostly this works! There is some oddness moving slice points around that I'll continue to work on, and the plugin's a bit meh style-wise, but otherwise ... yeah. I think it's really fun right now, anyways
 
 ## Building
 Once prerequisites are installed (see below), run build.sh on linux and mac, or build.bat on windows.
