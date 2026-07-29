@@ -15,18 +15,18 @@ This entire plugin is basically based off of my memory of having the Teenage Eng
 
 ## Walkthrough
 
-- On the top bar, load a sample, auto-slice, save and load presets, change the BPM the sequence plays at (in standalone mode), change the play mode from polyphonic to mono (choking all other hits), play and stop the sequencer, and open the settings page (elaborated at bottom of section).
+- On the top bar, load a sample, auto-slice, save and load presets, play and stop the sequencer, open settings (change MIDI note settings and theme), and change the BPM the sequence plays at (in standalone mode).
 
-- The top screen is where you do the slicing. The plugin shows your sample there, and auto-slices using a transient detector: you can adjust the slice sensitivity and reslice if you think it got it wrong, or you can manually adjust each slice yourself per sample.
+- The top screen shows the slices. The plugin shows your sample there, and auto-slices using a transient detector. You can adjust the slice sensitivity and reslice if you think it got it wrong, or if you want to slice at specific times you can move the sliders. You can also change the pitch of each slice up or down two octaves! If you want to set exact slicing or an exact pitch amount, you can click on the slice, then edit it with the edit options at the bottom.
 
-- The bottom screen is where the sequencing of the slices happens, in a twelve-lane up to 16-step sequencer. Press 'Randomize All' to randomize everything about the notes that you want, and mess around. Click a step to adjust all of its parameters using the bottom sliders and boxes, including pitch (which stacks with the per-slice pitch), nudging slices left/right, probability, and ratchet amount (1x to 8x). 
+- The bottom screen is where the sequencing of the slices happens, in a twelve-lane up to 16-step sequencer with up to 32 patterns. Press 'Randomize All' to randomize a pattern with a randomizer with some slidable options, and mess around. Click a step to adjust all of its parameters using the bottom sliders and boxes, including pitch (which stacks with the per-slice pitch), nudging slices left/right, probability, and ratchet amount (1x to 8x, combine with nudge if you want a ratchet in a specific place). 
 
-- Toggle whether a pattern switch happens instantly, or waits to land on the beat. Have up to 32 patterns and switch between them to make a song ... or just have fun, IDK. It's pretty fun!
-
-- The plugin accepts MIDI notes. By default the plugin maps each slice to the c2-b2 range, so you can play each slice with a keyboard. If you are using the sequencer, patterns 1-11 are mapped from c3-a#3, the start note is mapped to b3, and the stop note is mapped to c4. You can also of course click the buttons with the mouse.
+- Toggle whether a pattern switch happens instantly, or waits to land on the beat. Also toggle whether a pattern switch starts everything on the 1 again. You can theoretically make a bunch of patterns and switch between them to make a song! Or have fun! Or drop a loop and just see what happens.
 
 ### Settings 
 - You can change the MIDI note settings in the settings, and change the theme of the plugin. 
+- By default the plugin maps each slice to the c2-b2 range, so you can play each slice in one octave. If you are using the sequencer, patterns 1-11 are mapped from c3-a#3, the start note is mapped to b3, and the stop note is mapped to c4. You can also of course click the buttons with the mouse.
+- There are four themes: minimal (the default theme), cute, old-school, and futuristic.
 
 ## Building
 Once prerequisites are installed (see below), run build.sh on linux and mac, or build.bat on windows.
@@ -40,10 +40,3 @@ Once prerequisites are installed (see below), run build.sh on linux and mac, or 
 - sudo dnf install libXcursor-devel libXcomposite-devel gtk3-devel webkit2gtk4.1-devel freetype-devel curl-devel
 ### MacOS
 - xcode-select --install (everything else is already there by default)
-
-## Status
-
-- Tested for a bit and mostly works as expected. Things to possibly add/change:
-- Choke groups, to set eg multiple samples to the same choke group, instead of just having a mono/poly toggle. Also make the current mono setting more consistent with what takes priority
-- Have the pattern change when all of the lanes end. Not totally sure that it works that way right now, it's not fully consistent from what I was seeing in testing.
-- Maybe a pattern chain option?
