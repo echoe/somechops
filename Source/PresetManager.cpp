@@ -66,8 +66,8 @@ std::unique_ptr<juce::XmlElement> PresetManager::buildXml (DrumSampler& sampler,
     root->setAttribute ("version", 1);
     root->setAttribute ("bpm", bpm);
     root->setAttribute ("currentPattern", currentPatternIndex);
-    root->setAttribute ("chokeMode", sampler.getChokeMode());
     root->setAttribute ("uiTheme", uiTheme);
+    root->setAttribute ("resetPatternOnChange", sequencer.getResetPatternOnChange());
 
     // --- MIDI note mapping ---
     auto* midiEl = root->createNewChildElement ("MidiMapping");
@@ -97,6 +97,7 @@ std::unique_ptr<juce::XmlElement> PresetManager::buildXml (DrumSampler& sampler,
         sliceEl->setAttribute ("end", sl.endSample);
         sliceEl->setAttribute ("trimmedEnd", sl.trimmedEnd);
         sliceEl->setAttribute ("basePitch", sl.basePitch);
+        sliceEl->setAttribute ("chokeGroup", sl.chokeGroup);
         sliceEl->setAttribute ("name", sl.name);
     }
 
@@ -135,15 +136,13 @@ std::unique_ptr<juce::XmlElement> PresetManager::buildXml (DrumSampler& sampler,
 bool PresetManager::applyXml (const juce::XmlElement& root, DrumSampler& sampler, Sequencer& sequencer,
                                int& currentPatternIndexOut, double& bpmOut, MidiMappingSettings& midiOut, int& uiThemeOut)
 {
-    // Accept the current tag name, plus the legacy one from before the project was
-    // renamed from DrumChop to SomeChops, so old presets still load.
-    if (root.getTagName() != "SomeChopsPreset" && root.getTagName() != "DrumChopPreset")
+    if (root.getTagName() != "SomeChopsPreset")
         return false;
 
     bpmOut = root.getDoubleAttribute ("bpm", 120.0);
     currentPatternIndexOut = root.getIntAttribute ("currentPattern", 0);
-    sampler.setChokeMode (root.getBoolAttribute ("chokeMode", false));
     uiThemeOut = root.getIntAttribute ("uiTheme", uiThemeOut);
+    sequencer.setResetPatternOnChange (root.getBoolAttribute ("resetPatternOnChange", false));
 
     if (auto* midiEl = root.getChildByName ("MidiMapping"))
     {
@@ -177,6 +176,7 @@ bool PresetManager::applyXml (const juce::XmlElement& root, DrumSampler& sampler
             sl.endSample = sliceEl->getIntAttribute ("end");
             sl.trimmedEnd = sliceEl->getIntAttribute ("trimmedEnd", sl.endSample);
             sl.basePitch = (float) sliceEl->getDoubleAttribute ("basePitch", 0.0);
+            sl.chokeGroup = sliceEl->getIntAttribute ("chokeGroup", 0);
             sl.name = sliceEl->getStringAttribute ("name");
             newSlices.push_back (sl);
         }

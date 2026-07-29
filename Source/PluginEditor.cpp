@@ -724,7 +724,6 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     addAndMakeVisible (savePresetButton);
     addAndMakeVisible (loadPresetButton);
     addAndMakeVisible (playStopButton);
-    addAndMakeVisible (chokeModeToggle);
     addAndMakeVisible (bpmSlider);
     addAndMakeVisible (bpmLabel);
     addAndMakeVisible (settingsButton);
@@ -740,10 +739,13 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     addAndMakeVisible (sliceEndEditor);
     addAndMakeVisible (slicePitchFieldLabel);
     addAndMakeVisible (slicePitchEditor);
+    addAndMakeVisible (sliceChokeGroupFieldLabel);
+    addAndMakeVisible (sliceChokeGroupEditor);
     addAndMakeVisible (patternSelector);
     addAndMakeVisible (randomizeButton);
     addAndMakeVisible (clearButton);
     addAndMakeVisible (quantizePatternChangeToggle);
+    addAndMakeVisible (resetPatternOnChangeToggle);
     addAndMakeVisible (densitySlider);
     addAndMakeVisible (densityLabel);
     addAndMakeVisible (pitchRangeSlider);
@@ -814,9 +816,11 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     sliceStartEditor.setInputRestrictions (0, "0123456789");
     sliceEndEditor.setInputRestrictions (0, "0123456789");
     slicePitchEditor.setInputRestrictions (0, "-0123456789.");
+    sliceChokeGroupEditor.setInputRestrictions (0, "0123456789");
     sliceStartEditor.setEnabled (false);
     sliceEndEditor.setEnabled (false);
     slicePitchEditor.setEnabled (false);
+    sliceChokeGroupEditor.setEnabled (false);
 
     auto commitSliceEdits = [this]
     {
@@ -829,6 +833,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
         const int newStart = sliceStartEditor.getText().getIntValue();
         const int newEnd = sliceEndEditor.getText().getIntValue();
         const float newPitch = slicePitchEditor.getText().getFloatValue();
+        const int newChokeGroup = sliceChokeGroupEditor.getText().getIntValue();
 
         // Same ordering as the slider path: move start (keeping the outer/detected end
         // boundary), then set the adjustable end within that boundary. Nothing here
@@ -836,6 +841,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
         sampler.setSliceBounds (selectedSlice, newStart, sl.endSample);
         sampler.setSliceTrimmedLength (selectedSlice, newEnd);
         sampler.setSlicePitch (selectedSlice, newPitch);
+        sampler.setSliceChokeGroup (selectedSlice, newChokeGroup);
 
         updateSelectedSliceControls(); // reflect whatever actually got clamped/applied
         waveformView.repaint();
@@ -847,6 +853,8 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     sliceEndEditor.onFocusLost = commitSliceEdits;
     slicePitchEditor.onReturnKey = commitSliceEdits;
     slicePitchEditor.onFocusLost = commitSliceEdits;
+    sliceChokeGroupEditor.onReturnKey = commitSliceEdits;
+    sliceChokeGroupEditor.onFocusLost = commitSliceEdits;
 
     padGrid.onPadSelected = [this] (int pad)
     {
@@ -906,15 +914,15 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
 
     savePresetButton.onClick = [this]
     {
-        fileChooser = std::make_unique<juce::FileChooser> ("Save preset", juce::File(), "*.dchp");
+        fileChooser = std::make_unique<juce::FileChooser> ("Save preset", juce::File(), "*.schop");
         fileChooser->launchAsync (juce::FileBrowserComponent::saveMode,
             [this] (const juce::FileChooser& fc)
             {
                 auto file = fc.getResult();
                 if (file != juce::File())
                 {
-                    if (! file.hasFileExtension (".dchp"))
-                        file = file.withFileExtension (".dchp");
+                    if (! file.hasFileExtension (".schop"))
+                        file = file.withFileExtension (".schop");
 
                     processor.getPresetManager().savePreset (file, processor.getSampler(), processor.getSequencer(),
                         processor.getSequencer().getCurrentPatternIndex(), processor.currentBpmForSave, processor.midiSettings, processor.uiTheme);
@@ -924,7 +932,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
 
     loadPresetButton.onClick = [this]
     {
-        fileChooser = std::make_unique<juce::FileChooser> ("Load preset", juce::File(), "*.dchp");
+        fileChooser = std::make_unique<juce::FileChooser> ("Load preset", juce::File(), "*.schop");
         fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
             [this] (const juce::FileChooser& fc)
             {
@@ -937,8 +945,8 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
                     {
                         processor.getSequencer().setCurrentPatternIndex (patternIndex);
                         refreshPatternSelector();
-                        chokeModeToggle.setToggleState (processor.getSampler().getChokeMode(), juce::dontSendNotification);
                         quantizePatternChangeToggle.setToggleState (processor.midiSettings.quantizePatternChanges, juce::dontSendNotification);
+                        resetPatternOnChangeToggle.setToggleState (processor.getSequencer().getResetPatternOnChange(), juce::dontSendNotification);
                         processor.manualBpm = bpm;
                         bpmSlider.setValue (bpm, juce::dontSendNotification);
                         settingsPanel.refresh();
@@ -952,18 +960,18 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
             });
     };
 
-    chokeModeToggle.setToggleState (processor.getSampler().getChokeMode(), juce::dontSendNotification);
-    chokeModeToggle.onClick = [this]
-    {
-        processor.getSampler().setChokeMode (chokeModeToggle.getToggleState());
-    };
-
     // Shared with MIDI-triggered pattern switches (processBlock reads processor.midiSettings
     // directly), so this toggle just mirrors that state rather than owning its own.
     quantizePatternChangeToggle.setToggleState (processor.midiSettings.quantizePatternChanges, juce::dontSendNotification);
     quantizePatternChangeToggle.onClick = [this]
     {
         processor.midiSettings.quantizePatternChanges = quantizePatternChangeToggle.getToggleState();
+    };
+
+    resetPatternOnChangeToggle.setToggleState (processor.getSequencer().getResetPatternOnChange(), juce::dontSendNotification);
+    resetPatternOnChangeToggle.onClick = [this]
+    {
+        processor.getSequencer().setResetPatternOnChange (resetPatternOnChangeToggle.getToggleState());
     };
 
     playStopButton.onClick = [this]
@@ -1075,6 +1083,7 @@ void SomeChopsAudioProcessorEditor::updateSelectedSliceControls()
     sliceStartEditor.setEnabled (hasSelection);
     sliceEndEditor.setEnabled (hasSelection);
     slicePitchEditor.setEnabled (hasSelection);
+    sliceChokeGroupEditor.setEnabled (hasSelection);
 
     if (! hasSelection)
     {
@@ -1092,6 +1101,8 @@ void SomeChopsAudioProcessorEditor::updateSelectedSliceControls()
         sliceEndEditor.setText (juce::String (sl.trimmedEnd), juce::dontSendNotification);
     if (! slicePitchEditor.hasKeyboardFocus (false))
         slicePitchEditor.setText (juce::String (sl.basePitch, 1), juce::dontSendNotification);
+    if (! sliceChokeGroupEditor.hasKeyboardFocus (false))
+        sliceChokeGroupEditor.setText (juce::String (sl.chokeGroup), juce::dontSendNotification);
 }
 
 void SomeChopsAudioProcessorEditor::paint (juce::Graphics& g)
@@ -1129,8 +1140,6 @@ void SomeChopsAudioProcessorEditor::resized()
     loadPresetButton.setBounds (topBar.removeFromLeft (100));
     topBar.removeFromLeft (10);
     playStopButton.setBounds (topBar.removeFromLeft (90));
-    topBar.removeFromLeft (10);
-    chokeModeToggle.setBounds (topBar.removeFromLeft (130));
 
     r.removeFromTop (6);
     waveformView.setBounds (r.removeFromTop (160));
@@ -1157,6 +1166,9 @@ void SomeChopsAudioProcessorEditor::resized()
     sliceEditorBar.removeFromLeft (14);
     slicePitchFieldLabel.setBounds (sliceEditorBar.removeFromLeft (120));
     slicePitchEditor.setBounds (sliceEditorBar.removeFromLeft (70));
+    sliceEditorBar.removeFromLeft (14);
+    sliceChokeGroupFieldLabel.setBounds (sliceEditorBar.removeFromLeft (150));
+    sliceChokeGroupEditor.setBounds (sliceEditorBar.removeFromLeft (50));
 
     // Pattern selection/switching controls on their own row...
     r.removeFromTop (8);
@@ -1164,6 +1176,8 @@ void SomeChopsAudioProcessorEditor::resized()
     patternSelector.setBounds (patternBar.removeFromLeft (120));
     patternBar.removeFromLeft (10);
     quantizePatternChangeToggle.setBounds (patternBar.removeFromLeft (150));
+    patternBar.removeFromLeft (10);
+    resetPatternOnChangeToggle.setBounds (patternBar.removeFromLeft (220));
 
     // ...and randomization gets its own two rows below, so its sliders can be much longer.
     r.removeFromTop (6);

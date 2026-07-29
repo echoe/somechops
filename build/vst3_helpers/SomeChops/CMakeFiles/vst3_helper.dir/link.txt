@@ -1,0 +1,1 @@
+/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/vst3_helper.dir/link.d CMakeFiles/vst3_helper.dir/home/iris/JUCE/modules/juce_audio_plugin_client/VST3/juce_VST3ManifestHelper.cpp.o -o vst3_helper

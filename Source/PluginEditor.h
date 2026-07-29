@@ -212,7 +212,6 @@ private:
     juce::TextButton savePresetButton { "Save Preset" };
     juce::TextButton loadPresetButton { "Load Preset" };
     juce::TextButton playStopButton { "Play" };
-    juce::ToggleButton chokeModeToggle { "Choke (mono)" };
     juce::Slider bpmSlider;
     juce::Label bpmLabel { {}, "BPM" };
     juce::TextButton settingsButton { "Settings" };
@@ -228,6 +227,7 @@ private:
     juce::TextButton randomizeButton { "Randomize All" };
     juce::TextButton clearButton { "Clear Pattern" };
     juce::ToggleButton quantizePatternChangeToggle { "Wait for pattern end" };
+    juce::ToggleButton resetPatternOnChangeToggle { "Reset steps on pattern change" };
     juce::Slider densitySlider, pitchRangeSlider, maxRatchetSlider, nudgeRangeSlider;
     juce::Label densityLabel { {}, "Density" }, pitchRangeLabel { {}, "Pitch Range" }, maxRatchetLabel { {}, "Max Ratchet" },
                 nudgeRangeLabel { {}, "Nudge Range" };
@@ -247,8 +247,9 @@ private:
     // overlap — nothing here or in DrumSampler clamps a slice against its neighbors.
     juce::Label selectedSliceLabel { {}, "No slice selected" };
     juce::Label sliceStartFieldLabel { {}, "Start (samples)" }, sliceEndFieldLabel { {}, "End (samples)" },
-                slicePitchFieldLabel { {}, "Pitch (semitones)" };
-    juce::TextEditor sliceStartEditor, sliceEndEditor, slicePitchEditor;
+                slicePitchFieldLabel { {}, "Pitch (semitones)" },
+                sliceChokeGroupFieldLabel { {}, "Choke Group (0=none)" };
+    juce::TextEditor sliceStartEditor, sliceEndEditor, slicePitchEditor, sliceChokeGroupEditor;
     int selectedSlice = -1;
 
     std::unique_ptr<juce::FileChooser> fileChooser;

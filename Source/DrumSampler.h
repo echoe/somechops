@@ -15,6 +15,12 @@ struct Slice
     float basePitch = 0.0f;  // -24..+24 semitones; permanently retunes this sample's playback speed
     juce::String name;
 
+    // 0 = no choke group (this slice never chokes anything, and is never choked).
+    // Any nonzero value groups slices together: triggering one slice immediately
+    // fades out any other currently-sounding slice sharing the same group (classic
+    // hi-hat open/closed behaviour, but generalized to any group of slices/pads).
+    int chokeGroup = 0;
+
     int getPlaybackLength() const { return juce::jmax (1, trimmedEnd - startSample); }
 };
 
@@ -29,6 +35,14 @@ struct DrumVoice
     float envelope = 1.0f;       // simple linear fade-out envelope near slice end to avoid clicks
     int padIndex = -1;
     int delaySamples = 0;        // samples to wait, within the current block, before this voice starts
+
+    // >= 0 while this voice is being choked out by a newly-triggered slice in the same
+    // choke group; counts down from kFadeSamples to 0. -1 means "not choking" (either
+    // playing normally, or already silent). Fades the voice out from wherever it
+    // currently is, rather than jumping its read position to the tail of the sample —
+    // jumping there would play whatever audio happens to live at the end of the slice
+    // for a few samples, which is audible as a random, unrelated blip.
+    int chokeFadeSamplesRemaining = -1;
 };
 
 // Owns the loaded source sample, its slices, and renders the drum voices.
@@ -49,6 +63,7 @@ public:
     void setSliceBounds (int sliceIndex, int startSample, int endSample);
     void setSliceTrimmedLength (int sliceIndex, int newTrimmedEnd);
     void setSlicePitch (int sliceIndex, float semitones);
+    void setSliceChokeGroup (int sliceIndex, int chokeGroup);
     int getNumSlices() const { return (int) slices.size(); }
     const Slice& getSlice (int index) const { return slices[(size_t) index]; }
     std::vector<Slice>& getSlices() { return slices; }
@@ -60,12 +75,6 @@ public:
     // starting at the top of the block.
     void triggerPad (int padIndex, float pitchSemitones = 0.0f, float gain = 1.0f, int delaySamples = 0);
     void stopAllVoices();
-
-    // Poly (default): overlapping hits all ring out together.
-    // Choke: triggering any new hit quickly fades out every other currently-sounding
-    // voice first, so only one note sounds at a time across the whole kit.
-    void setChokeMode (bool shouldChoke) { chokeMode = shouldChoke; }
-    bool getChokeMode() const { return chokeMode; }
 
     void renderNextBlock (juce::AudioBuffer<float>& output, int startSample, int numSamples);
 
@@ -82,7 +91,6 @@ private:
 
     std::vector<Slice> slices;
     std::array<DrumVoice, kMaxVoices> voices;
-    bool chokeMode = false;
 
     // Guards sourceBuffer/slices/voices against the message thread (sample loading,
     // slicing, slider edits) and the audio thread (triggerPad/renderNextBlock)
@@ -95,9 +103,10 @@ private:
 
     int findFreeVoice();
 
-    // Fades out all currently active voices quickly (over kFadeSamples) rather than
-    // hard-cutting them, so choke mode doesn't click. Only ever called from within
-    // triggerPad(), which already holds `lock` (CriticalSection is re-entrant on the
-    // same thread, so this doesn't need its own lock).
-    void chokeAllVoices();
+    // Starts a fade-out (over kFadeSamples, handled in renderNextBlock) on every
+    // currently-active voice whose slice belongs to the given choke group. Only ever
+    // called from within triggerPad(), which already holds `lock` (CriticalSection is
+    // re-entrant on the same thread, so this doesn't need its own lock). `group` is
+    // assumed nonzero — group 0 means "no choke group" and never chokes anything.
+    void chokeGroupVoices (int group);
 };

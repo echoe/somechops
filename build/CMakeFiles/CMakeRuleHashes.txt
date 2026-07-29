@@ -1,0 +1,3 @@
+# Hashes of file build rules.
+490aeffe60f6d1ccfc5985159d2a281f CMakeFiles/SomeChops_vst3_helper
+00062a91b0fc02a74e9f9555c9659b9d SomeChops_artefacts/JuceLibraryCode/JuceHeader.h

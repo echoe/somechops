@@ -91,6 +91,16 @@ void DrumSampler::setSlicePitch (int sliceIndex, float semitones)
     slices[(size_t) sliceIndex].basePitch = juce::jlimit (-24.0f, 24.0f, semitones);
 }
 
+void DrumSampler::setSliceChokeGroup (int sliceIndex, int chokeGroup)
+{
+    const juce::ScopedLock sl (lock);
+
+    if (sliceIndex < 0 || sliceIndex >= (int) slices.size())
+        return;
+
+    slices[(size_t) sliceIndex].chokeGroup = juce::jmax (0, chokeGroup);
+}
+
 void DrumSampler::setSlices (std::vector<Slice> newSlices)
 {
     const juce::ScopedLock sl (lock);
@@ -124,8 +134,9 @@ void DrumSampler::triggerPad (int padIndex, float pitchSemitones, float gain, in
     if (padIndex < 0 || padIndex >= (int) slices.size())
         return;
 
-    if (chokeMode)
-        chokeAllVoices();
+    const int group = slices[(size_t) padIndex].chokeGroup;
+    if (group != 0)
+        chokeGroupVoices (group);
 
     const int voiceIdx = findFreeVoice();
     auto& v = voices[(size_t) voiceIdx];
@@ -138,14 +149,15 @@ void DrumSampler::triggerPad (int padIndex, float pitchSemitones, float gain, in
     v.envelope = 1.0f;
     v.padIndex = padIndex;
     v.delaySamples = juce::jmax (0, delaySamples);
+    v.chokeFadeSamplesRemaining = -1; // fresh voice, not being choked
 }
 
-void DrumSampler::chokeAllVoices()
+void DrumSampler::chokeGroupVoices (int group)
 {
     for (auto& v : voices)
     {
-        if (! v.active)
-            continue;
+        if (! v.active || v.chokeFadeSamplesRemaining >= 0)
+            continue; // inactive, or already fading out from a previous choke
 
         if (v.sliceIndex < 0 || v.sliceIndex >= (int) slices.size())
         {
@@ -153,11 +165,8 @@ void DrumSampler::chokeAllVoices()
             continue;
         }
 
-        // Jump each active voice to no more than kFadeSamples from the end of its
-        // playback length, so the existing end-of-slice fade (in renderNextBlock)
-        // takes it out cleanly instead of clicking.
-        const int sliceLen = slices[(size_t) v.sliceIndex].getPlaybackLength();
-        v.position = juce::jmax (v.position, (double) juce::jmax (0, sliceLen - kFadeSamples));
+        if (slices[(size_t) v.sliceIndex].chokeGroup == group)
+            v.chokeFadeSamplesRemaining = kFadeSamples;
     }
 }
 
@@ -219,6 +228,20 @@ void DrumSampler::renderNextBlock (juce::AudioBuffer<float>& output, int startSa
             const double samplesLeft = (double) sliceLen - v.position;
             if (samplesLeft < kFadeSamples)
                 env = (float) (samplesLeft / (double) kFadeSamples);
+
+            // Being choked out by a newer hit in the same choke group: fade from
+            // wherever this voice currently is (not from its slice's tail), then stop.
+            if (v.chokeFadeSamplesRemaining >= 0)
+            {
+                env *= (float) v.chokeFadeSamplesRemaining / (float) kFadeSamples;
+
+                if (v.chokeFadeSamplesRemaining == 0)
+                {
+                    v.active = false;
+                    break;
+                }
+                --v.chokeFadeSamplesRemaining;
+            }
 
             for (int ch = 0; ch < numOutCh; ++ch)
             {

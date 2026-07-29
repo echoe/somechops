@@ -63,6 +63,13 @@ void Sequencer::requestPatternChange (int newIndex, bool immediate)
     {
         currentPatternIndex = newIndex;
         pendingPatternIndex = -1;
+
+        // Reset every lane back to its own step 1: since the next processBlock only
+        // advances trackStep on a step-boundary crossing (not right here), setting
+        // these to -1 means the very next boundary brings every lane to step 0
+        // together, same as at playback start.
+        if (resetOnPatternChange)
+            trackStep.fill (-1);
     }
     else
     {
@@ -74,6 +81,18 @@ int Sequencer::getPendingPatternIndex() const
 {
     const juce::ScopedLock sl (lock);
     return pendingPatternIndex;
+}
+
+void Sequencer::setResetPatternOnChange (bool shouldReset)
+{
+    const juce::ScopedLock sl (lock);
+    resetOnPatternChange = shouldReset;
+}
+
+bool Sequencer::getResetPatternOnChange() const
+{
+    const juce::ScopedLock sl (lock);
+    return resetOnPatternChange;
 }
 
 void Sequencer::resetPosition()
@@ -290,15 +309,50 @@ std::vector<SequencerHit> Sequencer::processBlock (int numSamples)
         if (stepPhase >= samplesPerStep - 0.0001)
         {
             stepPhase = 0.0;
-            // currentStep is the global bar position (0..15) — kept for pattern-switch
-            // quantization and as a shared "beat" reference; it does NOT index each
-            // track's steps directly anymore, since tracks can loop at different lengths.
+
+            // A deferred pattern change should take effect when the *longest* lane in
+            // the current (about-to-be-superseded) pattern finishes its own loop, not
+            // always after a fixed 16 steps. If every lane in this pattern is shorter
+            // than 16 (e.g. an odd-meter idea where nothing uses the full 16 steps), a
+            // fixed 16-step wait would add unwanted extra time before switching — so
+            // find the longest lane's length and detect when it wraps back to step 0.
+            // Ties (multiple lanes sharing the max length) always wrap in the same tick
+            // since every lane advances once per tick, so checking any one of them is enough.
+            bool longestLaneWrapsThisTick = false;
+            {
+                const auto& curPatternForWrapCheck = patterns[(size_t) currentPatternIndex];
+                int maxLen = 1;
+                for (int pad = 0; pad < kNumPads; ++pad)
+                    maxLen = juce::jmax (maxLen, juce::jlimit (1, kNumSteps, curPatternForWrapCheck.tracks[(size_t) pad].numSteps));
+
+                for (int pad = 0; pad < kNumPads; ++pad)
+                {
+                    const int len = juce::jlimit (1, kNumSteps, curPatternForWrapCheck.tracks[(size_t) pad].numSteps);
+                    if (len == maxLen && trackStep[(size_t) pad] == maxLen - 1)
+                    {
+                        longestLaneWrapsThisTick = true;
+                        break;
+                    }
+                }
+            }
+
+            // currentStep is the global bar position (0..15) — kept as a shared "beat"
+            // reference for the UI. It does NOT index each track's steps directly, and
+            // no longer gates pattern switching either, since tracks can loop at
+            // different lengths.
             currentStep = (currentStep + 1) % kNumSteps;
 
-            if (currentStep == 0 && pendingPatternIndex >= 0)
+            if (longestLaneWrapsThisTick && pendingPatternIndex >= 0)
             {
                 currentPatternIndex = pendingPatternIndex;
                 pendingPatternIndex = -1;
+
+                // Same reset as the immediate path: since the per-pad loop just below
+                // this runs on every tick (including this one), setting trackStep to -1
+                // here means it becomes 0 for every lane in that very loop, so all lanes
+                // start the freshly-switched-to pattern together at step 1.
+                if (resetOnPatternChange)
+                    trackStep.fill (-1);
             }
 
             std::uniform_real_distribution<float> unit (0.0f, 1.0f);

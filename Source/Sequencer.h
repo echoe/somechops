@@ -72,6 +72,14 @@ public:
     void requestPatternChange (int newIndex, bool immediate);
     int getPendingPatternIndex() const;
 
+    // When enabled, every lane restarts at its own step 1 the moment a pattern change
+    // takes effect (immediate or deferred), instead of each lane continuing on from
+    // wherever its own step counter happened to be. Handy for patterns/lanes of
+    // different lengths, where otherwise a lane mid-loop would stay out of phase
+    // with the freshly-switched-to pattern instead of starting clean together.
+    void setResetPatternOnChange (bool shouldReset);
+    bool getResetPatternOnChange() const;
+
     // Resets the step/ratchet clock to the start of the pattern. Handy when a manual
     // play button (rather than host transport) starts the sequencer, for a clean count-in.
     void resetPosition();
@@ -119,6 +127,7 @@ private:
     std::array<Pattern, kNumPatterns> patterns;
     int currentPatternIndex = 0;
     int pendingPatternIndex = -1; // -1 = no pattern change queued
+    bool resetOnPatternChange = false;
 
     double sampleRate = 44100.0;
     double bpm = 120.0;

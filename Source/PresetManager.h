@@ -12,7 +12,7 @@ class PresetManager
 public:
     PresetManager();
 
-    static constexpr const char* fileExtension = ".dchp";
+    static constexpr const char* fileExtension = ".schop";
 
     bool savePreset (const juce::File& file, DrumSampler& sampler, Sequencer& sequencer,
                       int currentPatternIndex, double bpm, const MidiMappingSettings& midi, int uiTheme);
