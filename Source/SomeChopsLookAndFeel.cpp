@@ -278,8 +278,8 @@ void SomeChopsLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButt
     g.setColour (button.isEnabled() ? palette.textColour : palette.textColour.withAlpha (0.5f));
     g.setFont (juce::FontOptions (13.0f));
     const int textX = (int) switchBounds.getRight() + 8;
-    g.drawFittedText (button.getButtonText(), textX, 0, juce::jmax (0, (int)bounds.getWidth() - textX - 2),
-                       bounds.getHeight(), juce::Justification::centredLeft, 1);
+    g.drawFittedText (button.getButtonText(), textX, 0, juce::jmax (0, (int) bounds.getWidth() - textX - 2),
+                       (int) bounds.getHeight(), juce::Justification::centredLeft, 1);
 }
 
 void SomeChopsLookAndFeel::drawComboBox (juce::Graphics& g, int width, int height, bool /*isButtonDown*/,

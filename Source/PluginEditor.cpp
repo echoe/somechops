@@ -707,13 +707,13 @@ void SettingsPanel::resized()
 // SomeChopsAudioProcessorEditor
 //==============================================================================
 SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProcessor& p)
-    : AudioProcessorEditor (&p), processor (p),
+    : AudioProcessorEditor (&p), audioProcessor (p),
       waveformView (p), slicePitchRow (p), sliceRangeRow (p), padGrid (p), stepGrid (p),
       trackLengthColumn (p),
       settingsPanel (p)
 {
     setLookAndFeel (&lookAndFeel);
-    lookAndFeel.setTheme ((UiTheme) processor.uiTheme);
+    lookAndFeel.setTheme ((UiTheme) audioProcessor.uiTheme);
 
     setSize (1200, 930);
 
@@ -773,7 +773,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     sensitivitySlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 35, 20);
 
     bpmSlider.setRange (40.0, 300.0, 1.0);
-    bpmSlider.setValue (processor.manualBpm, juce::dontSendNotification);
+    bpmSlider.setValue (audioProcessor.manualBpm, juce::dontSendNotification);
     bpmSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     bpmSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 55, 20);
 
@@ -824,10 +824,10 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
 
     auto commitSliceEdits = [this]
     {
-        if (selectedSlice < 0 || selectedSlice >= processor.getSampler().getNumSlices())
+        if (selectedSlice < 0 || selectedSlice >= audioProcessor.getSampler().getNumSlices())
             return;
 
-        auto& sampler = processor.getSampler();
+        auto& sampler = audioProcessor.getSampler();
         const auto sl = sampler.getSlice (selectedSlice); // copy: bounds calls below may reallocate the reference
 
         const int newStart = sliceStartEditor.getText().getIntValue();
@@ -870,7 +870,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
 
     refreshPatternSelector();
 
-    bpmSlider.onValueChange = [this] { processor.manualBpm = bpmSlider.getValue(); };
+    bpmSlider.onValueChange = [this] { audioProcessor.manualBpm = bpmSlider.getValue(); };
 
     settingsButton.onClick = [this]
     {
@@ -895,7 +895,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
                 auto file = fc.getResult();
                 if (file.existsAsFile())
                 {
-                    processor.loadSampleFromFile (file);
+                    audioProcessor.loadSampleFromFile (file);
                     selectedSlice = -1;
                     updateSelectedSliceControls();
                     waveformView.rebuildWaveformCache();
@@ -906,7 +906,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
 
     autoSliceButton.onClick = [this]
     {
-        processor.getSampler().autoSlice ((float) sensitivitySlider.getValue());
+        audioProcessor.getSampler().autoSlice ((float) sensitivitySlider.getValue());
         selectedSlice = -1;
         updateSelectedSliceControls();
         waveformView.repaint();
@@ -924,8 +924,8 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
                     if (! file.hasFileExtension (".schop"))
                         file = file.withFileExtension (".schop");
 
-                    processor.getPresetManager().savePreset (file, processor.getSampler(), processor.getSequencer(),
-                        processor.getSequencer().getCurrentPatternIndex(), processor.currentBpmForSave, processor.midiSettings, processor.uiTheme);
+                    audioProcessor.getPresetManager().savePreset (file, audioProcessor.getSampler(), audioProcessor.getSequencer(),
+                        audioProcessor.getSequencer().getCurrentPatternIndex(), audioProcessor.currentBpmForSave, audioProcessor.midiSettings, audioProcessor.uiTheme);
                 }
             });
     };
@@ -941,16 +941,16 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
                 {
                     int patternIndex = 0;
                     double bpm = 120.0;
-                    if (processor.getPresetManager().loadPreset (file, processor.getSampler(), processor.getSequencer(), patternIndex, bpm, processor.midiSettings, processor.uiTheme))
+                    if (audioProcessor.getPresetManager().loadPreset (file, audioProcessor.getSampler(), audioProcessor.getSequencer(), patternIndex, bpm, audioProcessor.midiSettings, audioProcessor.uiTheme))
                     {
-                        processor.getSequencer().setCurrentPatternIndex (patternIndex);
+                        audioProcessor.getSequencer().setCurrentPatternIndex (patternIndex);
                         refreshPatternSelector();
-                        quantizePatternChangeToggle.setToggleState (processor.midiSettings.quantizePatternChanges, juce::dontSendNotification);
-                        resetPatternOnChangeToggle.setToggleState (processor.getSequencer().getResetPatternOnChange(), juce::dontSendNotification);
-                        processor.manualBpm = bpm;
+                        quantizePatternChangeToggle.setToggleState (audioProcessor.midiSettings.quantizePatternChanges, juce::dontSendNotification);
+                        resetPatternOnChangeToggle.setToggleState (audioProcessor.getSequencer().getResetPatternOnChange(), juce::dontSendNotification);
+                        audioProcessor.manualBpm = bpm;
                         bpmSlider.setValue (bpm, juce::dontSendNotification);
                         settingsPanel.refresh();
-                        lookAndFeel.setTheme ((UiTheme) processor.uiTheme);
+                        lookAndFeel.setTheme ((UiTheme) audioProcessor.uiTheme);
                         selectedSlice = -1;
                         updateSelectedSliceControls();
                         waveformView.rebuildWaveformCache();
@@ -960,39 +960,39 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
             });
     };
 
-    // Shared with MIDI-triggered pattern switches (processBlock reads processor.midiSettings
+    // Shared with MIDI-triggered pattern switches (processBlock reads audioProcessor.midiSettings
     // directly), so this toggle just mirrors that state rather than owning its own.
-    quantizePatternChangeToggle.setToggleState (processor.midiSettings.quantizePatternChanges, juce::dontSendNotification);
+    quantizePatternChangeToggle.setToggleState (audioProcessor.midiSettings.quantizePatternChanges, juce::dontSendNotification);
     quantizePatternChangeToggle.onClick = [this]
     {
-        processor.midiSettings.quantizePatternChanges = quantizePatternChangeToggle.getToggleState();
+        audioProcessor.midiSettings.quantizePatternChanges = quantizePatternChangeToggle.getToggleState();
     };
 
-    resetPatternOnChangeToggle.setToggleState (processor.getSequencer().getResetPatternOnChange(), juce::dontSendNotification);
+    resetPatternOnChangeToggle.setToggleState (audioProcessor.getSequencer().getResetPatternOnChange(), juce::dontSendNotification);
     resetPatternOnChangeToggle.onClick = [this]
     {
-        processor.getSequencer().setResetPatternOnChange (resetPatternOnChangeToggle.getToggleState());
+        audioProcessor.getSequencer().setResetPatternOnChange (resetPatternOnChangeToggle.getToggleState());
     };
 
     playStopButton.onClick = [this]
     {
-        processor.manualPlayActive = ! processor.manualPlayActive;
-        if (processor.manualPlayActive)
-            processor.getSequencer().resetPosition();
-        playStopButton.setButtonText (processor.manualPlayActive ? "Stop" : "Play");
+        audioProcessor.manualPlayActive = ! audioProcessor.manualPlayActive;
+        if (audioProcessor.manualPlayActive)
+            audioProcessor.getSequencer().resetPosition();
+        playStopButton.setButtonText (audioProcessor.manualPlayActive ? "Stop" : "Play");
     };
 
     patternSelector.onChange = [this]
     {
         const int newIndex = patternSelector.getSelectedId() - 1;
         const bool immediate = ! quantizePatternChangeToggle.getToggleState();
-        processor.getSequencer().requestPatternChange (newIndex, immediate);
+        audioProcessor.getSequencer().requestPatternChange (newIndex, immediate);
         stepGrid.repaint();
     };
 
     randomizeButton.onClick = [this]
     {
-        processor.getSequencer().randomizeAllTracks ((float) densitySlider.getValue(),
+        audioProcessor.getSequencer().randomizeAllTracks ((float) densitySlider.getValue(),
             (float) pitchRangeSlider.getValue(), (int) maxRatchetSlider.getValue(),
             (float) nudgeRangeSlider.getValue(), randomizeLengthsToggle.getToggleState());
         stepGrid.repaint();
@@ -1000,7 +1000,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
 
     clearButton.onClick = [this]
     {
-        processor.getSequencer().clearPattern (processor.getSequencer().getCurrentPatternIndex());
+        audioProcessor.getSequencer().clearPattern (audioProcessor.getSequencer().getCurrentPatternIndex());
         stepGrid.repaint();
     };
 
@@ -1014,22 +1014,22 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     stepRatchetSlider.onValueChange = [this]
     {
         if (selectedPad >= 0)
-            processor.getSequencer().setStepRatchet (selectedPad, selectedStep, (int) stepRatchetSlider.getValue());
+            audioProcessor.getSequencer().setStepRatchet (selectedPad, selectedStep, (int) stepRatchetSlider.getValue());
     };
     stepPitchSlider.onValueChange = [this]
     {
         if (selectedPad >= 0)
-            processor.getSequencer().setStepPitch (selectedPad, selectedStep, (float) stepPitchSlider.getValue());
+            audioProcessor.getSequencer().setStepPitch (selectedPad, selectedStep, (float) stepPitchSlider.getValue());
     };
     stepProbabilitySlider.onValueChange = [this]
     {
         if (selectedPad >= 0)
-            processor.getSequencer().setStepProbability (selectedPad, selectedStep, (float) stepProbabilitySlider.getValue());
+            audioProcessor.getSequencer().setStepProbability (selectedPad, selectedStep, (float) stepProbabilitySlider.getValue());
     };
     stepNudgeSlider.onValueChange = [this]
     {
         if (selectedPad >= 0)
-            processor.getSequencer().setStepNudge (selectedPad, selectedStep, (float) stepNudgeSlider.getValue());
+            audioProcessor.getSequencer().setStepNudge (selectedPad, selectedStep, (float) stepNudgeSlider.getValue());
     };
 
     updateSelectedStepControls();
@@ -1049,7 +1049,7 @@ void SomeChopsAudioProcessorEditor::refreshPatternSelector()
     patternSelector.clear (juce::dontSendNotification);
     for (int i = 0; i < kNumPatterns; ++i)
         patternSelector.addItem ("Pattern " + juce::String (i + 1), i + 1);
-    patternSelector.setSelectedId (processor.getSequencer().getCurrentPatternIndex() + 1, juce::dontSendNotification);
+    patternSelector.setSelectedId (audioProcessor.getSequencer().getCurrentPatternIndex() + 1, juce::dontSendNotification);
 }
 
 void SomeChopsAudioProcessorEditor::updateSelectedStepControls()
@@ -1066,7 +1066,7 @@ void SomeChopsAudioProcessorEditor::updateSelectedStepControls()
         return;
     }
 
-    const auto stepData = processor.getSequencer().getStep (selectedPad, selectedStep);
+    const auto stepData = audioProcessor.getSequencer().getStep (selectedPad, selectedStep);
     selectedStepLabel.setText ("Pad " + juce::String (selectedPad + 1) + " / Step " + juce::String (selectedStep + 1),
                                 juce::dontSendNotification);
     stepRatchetSlider.setValue (stepData.ratchet, juce::dontSendNotification);
@@ -1077,7 +1077,7 @@ void SomeChopsAudioProcessorEditor::updateSelectedStepControls()
 
 void SomeChopsAudioProcessorEditor::updateSelectedSliceControls()
 {
-    auto& sampler = processor.getSampler();
+    auto& sampler = audioProcessor.getSampler();
     const bool hasSelection = selectedSlice >= 0 && selectedSlice < sampler.getNumSlices();
 
     sliceStartEditor.setEnabled (hasSelection);

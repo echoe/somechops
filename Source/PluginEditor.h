@@ -200,7 +200,7 @@ public:
     void resized() override;
 
 private:
-    SomeChopsAudioProcessor& processor;
+    SomeChopsAudioProcessor& audioProcessor;
     SomeChopsLookAndFeel lookAndFeel; // set via setLookAndFeel() in the constructor; must be
                                        // unset in the destructor before this is destroyed
 
