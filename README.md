@@ -11,13 +11,14 @@ Adjust slice timings manually, by hand as well as with numbers. Play through sli
 
 Randomize the patterns. Play some chops.
 
-This entire plugin is basically based off of my memory of having the Teenage Engineering OP-1, which I hated other than its sample handler. You had to give it 12-second .wav files that it would automatically slice. Works well with breakbeats but you can also just sort of put whatever in if you really want, as long as the sample is long enough!
+This entire plugin is basically based off of my memory of having the Teenage Engineering OP-1, which I hated other than its sample handler ... combined with my love for the elektron sequencing workflow and Fors's Dyad. With the op-1, you had to give it 12-second .wav files that it would automatically slice. With the elektron workflow, you can basically load a sample in, press random, and then you get something unique that you can see if you like or not! 
+This plugin works well with breakbeats, but I've found that it makes interesting content with any sort of looped sound! But it's really personal preference.
 
 ## Walkthrough
 
 - On the top bar, load a sample, auto-slice, save and load presets, play and stop the sequencer, open settings (change MIDI note settings and theme), and change the BPM the sequence plays at (in standalone mode).
 
-- The top screen shows the slices. The plugin shows your sample there, and auto-slices using a transient detector. You can adjust the slice sensitivity and reslice if you think it got it wrong, or if you want to slice at specific times you can move the sliders. You can also change the pitch of each slice up or down two octaves! If you want to set exact slicing or an exact pitch amount, you can click on the slice, then edit it with the edit options at the bottom.
+- The top screen shows the slices. The plugin shows your sample there, and auto-slices using a transient detector. You can adjust the slice sensitivity and reslice if you think it got it wrong, or if you want to slice at specific times you can move the sliders. You can also change the pitch of each slice up or down two octaves! If you want to set exact slicing or an exact pitch amount, you can click on the slice, then edit it with the edit options at the bottom. There's also an option here to set choke points on in case you want them, I like having choke points on and it's a giant PITA to click every slice so ... yeah. Shortcuts.
 
 - The bottom screen is where the sequencing of the slices happens, in a twelve-lane up to 16-step sequencer with up to 32 patterns. Press 'Randomize All' to randomize a pattern with a randomizer with some slidable options, and mess around. Click a step to adjust all of its parameters using the bottom sliders and boxes, including pitch (which stacks with the per-slice pitch), nudging slices left/right, probability, and ratchet amount (1x to 8x, combine with nudge if you want a ratchet in a specific place). 
 
