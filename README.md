@@ -43,4 +43,7 @@ Once prerequisites are installed (see below), run build.sh on linux and mac, or 
 
 ## Status
 
-- I think this works well actually, and it's even themed now. Maybe will add choke groups, but that's about it.
+- Tested for a bit and mostly works as expected. Things to possibly add/change:
+- Choke groups, to set eg multiple samples to the same choke group, instead of just having a mono/poly toggle. Also make the current mono setting more consistent with what takes priority
+- Have the pattern change when all of the lanes end. Not totally sure that it works that way right now, it's not fully consistent from what I was seeing in testing.
+- Maybe a pattern chain option?
