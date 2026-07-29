@@ -10,8 +10,12 @@ static constexpr int kMaxVoices = 24;   // polyphony for ratchets/overlaps
 struct Slice
 {
     int startSample = 0;
-    int endSample   = 0;     // exclusive, into the original sample buffer
+    int endSample   = 0;     // exclusive, into the original sample buffer; always >= trimmedEnd.
+                             // Set by auto-slice to the next detected onset (or sample end, for
+                             // the last slice), but not a hard ceiling — setSliceTrimmedLength()
+                             // pulls this forward if the user trims past it.
     int trimmedEnd  = 0;     // <= endSample; this is the *adjustable length* the user can shorten
+                             // or lengthen (out to the full sample), independent of neighbors.
     float basePitch = 0.0f;  // -24..+24 semitones; permanently retunes this sample's playback speed
     juce::String name;
 

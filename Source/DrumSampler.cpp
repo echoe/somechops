@@ -78,7 +78,17 @@ void DrumSampler::setSliceTrimmedLength (int sliceIndex, int newTrimmedEnd)
         return;
 
     auto& slc = slices[(size_t) sliceIndex];
-    slc.trimmedEnd = juce::jlimit (slc.startSample + 1, slc.endSample, newTrimmedEnd);
+
+    // Trimming is allowed out to the full length of the loaded sample, not capped at
+    // this slice's endSample — which, for every slice but the last, is simply wherever
+    // the *next* auto-detected onset happened to land. Slices are explicitly allowed to
+    // overlap (nothing here clamps a slice against its neighbors), so stretching one out
+    // past a neighbor's start is legitimate and shouldn't be silently capped. endSample
+    // is pulled forward to match whenever trimmedEnd grows past it, since setSliceBounds
+    // relies on endSample always being >= trimmedEnd.
+    const int upperBound = juce::jmax (slc.startSample + 1, sourceBuffer.getNumSamples());
+    slc.trimmedEnd = juce::jlimit (slc.startSample + 1, upperBound, newTrimmedEnd);
+    slc.endSample = juce::jmax (slc.endSample, slc.trimmedEnd);
 }
 
 void DrumSampler::setSlicePitch (int sliceIndex, float semitones)
