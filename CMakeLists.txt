@@ -75,6 +75,6 @@ target_link_libraries(SomeChops PRIVATE
 option(SOMECHOPS_SANITIZE_ADDRESS "Build with AddressSanitizer + UndefinedBehaviorSanitizer enabled" OFF)
 if(SOMECHOPS_SANITIZE_ADDRESS)
     message(STATUS "AddressSanitizer + UndefinedBehaviorSanitizer enabled")
-    target_compile_options(SomeChops PRIVATE -fsanitize=address,undefined -g -O1 -fno-omit-frame-pointer)
-    target_link_options(SomeChops PRIVATE -fsanitize=address,undefined)
+    target_compile_options(SomeChops PUBLIC -fsanitize=address,undefined -g -O1 -fno-omit-frame-pointer)
+    target_link_options(SomeChops PUBLIC -fsanitize=address,undefined)
 endif()
