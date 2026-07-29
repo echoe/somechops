@@ -1,3 +1,0 @@
-/home/iris/Documents/Code/somechops/build/vst3_helpers/SomeChops/CMakeFiles/vst3_helper.dir
-/home/iris/Documents/Code/somechops/build/vst3_helpers/SomeChops/CMakeFiles/edit_cache.dir
-/home/iris/Documents/Code/somechops/build/vst3_helpers/SomeChops/CMakeFiles/rebuild_cache.dir
