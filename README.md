@@ -15,13 +15,18 @@ This entire plugin is basically based off of my memory of having the Teenage Eng
 
 ## Walkthrough
 
-- On the top bar, load a sample, auto-slice, save and load presets, change the BPM the sequence plays at (in standalone mode), change the play mode from polyphonic to mono (choking all other hits), play and stop the sequencer, and open the settings page [which lets you change MIDI note settings and theme].
+- On the top bar, load a sample, auto-slice, save and load presets, change the BPM the sequence plays at (in standalone mode), change the play mode from polyphonic to mono (choking all other hits), play and stop the sequencer, and open the settings page (elaborated at bottom of section).
 
 - The top screen is where you do the slicing. The plugin shows your sample there, and auto-slices using a transient detector: you can adjust the slice sensitivity and reslice if you think it got it wrong, or you can manually adjust each slice yourself per sample.
 
 - The bottom screen is where the sequencing of the slices happens, in a twelve-lane up to 16-step sequencer. Press 'Randomize All' to randomize everything about the notes that you want, and mess around. Click a step to adjust all of its parameters using the bottom sliders and boxes, including pitch (which stacks with the per-slice pitch), nudging slices left/right, probability, and ratchet amount (1x to 8x). 
 
 - Toggle whether a pattern switch happens instantly, or waits to land on the beat. Have up to 32 patterns and switch between them to make a song ... or just have fun, IDK. It's pretty fun!
+
+- The plugin accepts MIDI notes. By default the plugin maps each slice to the c2-b2 range, so you can play each slice with a keyboard. If you are using the sequencer, patterns 1-11 are mapped from c3-a#3, the start note is mapped to b3, and the stop note is mapped to c4. You can also of course click the buttons with the mouse.
+
+### Settings 
+- You can change the MIDI note settings in the settings, and change the theme of the plugin. 
 
 ## Building
 Once prerequisites are installed (see below), run build.sh on linux and mac, or build.bat on windows.
