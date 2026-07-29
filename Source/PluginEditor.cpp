@@ -482,7 +482,7 @@ SlicePitchRow::SlicePitchRow (SomeChopsAudioProcessor& p) : processor (p)
         addAndMakeVisible (s);
         s->setSliderStyle (juce::Slider::LinearHorizontal);
         s->setTextBoxStyle (juce::Slider::NoTextBox, true, 0, 0);
-        s->setRange (-24.0, 24.0, 0.1);
+        s->setRange (-24.0, 24.0, 1.0);
         s->setValue (0.0, juce::dontSendNotification);
         s->setEnabled (false);
 
@@ -874,7 +874,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     settingsPanel.onThemeChanged = [this] (int newTheme)
     {
         lookAndFeel.setTheme ((UiTheme) newTheme);
-        repaint(); // recursively redraws this editor and all its children with the new theme
+        sendLookAndFeelChange(); //force redraw of everything in theme to set new theme properly
     };
 
     // --- callbacks ---
