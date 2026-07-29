@@ -2,6 +2,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_extra/juce_gui_extra.h>
 #include "PluginProcessor.h"
+#include "SomeChopsLookAndFeel.h"
 
 //==============================================================================
 // Draws the loaded sample waveform with draggable slice-start markers (white)
@@ -175,9 +176,17 @@ private:
     juce::Slider stopNoteSlider;
     juce::Label stopNoteName;
 
+    juce::Label themeLabel { {}, "Theme" };
+    juce::ComboBox themeSelector;
+
     juce::TextButton closeButton { "Close" };
 
     void layoutRow (juce::Rectangle<int> row, juce::Label& label, juce::Slider& slider, juce::Label* noteName);
+
+public:
+    // Fired when the theme selector changes, with the new UiTheme's int value.
+    // The editor owns the actual LookAndFeel instance, so this just notifies it.
+    std::function<void (int)> onThemeChanged;
 };
 
 //==============================================================================
@@ -185,13 +194,15 @@ class SomeChopsAudioProcessorEditor : public juce::AudioProcessorEditor
 {
 public:
     explicit SomeChopsAudioProcessorEditor (SomeChopsAudioProcessor&);
-    ~SomeChopsAudioProcessorEditor() override = default;
+    ~SomeChopsAudioProcessorEditor() override;
 
     void paint (juce::Graphics&) override;
     void resized() override;
 
 private:
     SomeChopsAudioProcessor& processor;
+    SomeChopsLookAndFeel lookAndFeel; // set via setLookAndFeel() in the constructor; must be
+                                       // unset in the destructor before this is destroyed
 
     // Top bar
     juce::TextButton loadButton { "Load Sample" };

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(SomeChops VERSION 0.0.2)
+project(SomeChops VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -43,6 +43,7 @@ target_sources(SomeChops PRIVATE
     Source/DrumSampler.cpp
     Source/Sequencer.cpp
     Source/PresetManager.cpp
+    Source/SomeChopsLookAndFeel.cpp
 )
 
 target_compile_definitions(SomeChops PUBLIC
@@ -59,3 +60,21 @@ target_link_libraries(SomeChops PRIVATE
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags)
+
+# --- Optional: AddressSanitizer + UndefinedBehaviorSanitizer build ---
+# Enable with: cmake -B build-asan -DSOMECHOPS_SANITIZE_ADDRESS=ON
+# (ThreadSanitizer was tried here first, but doesn't work with this dependency
+# graph: TSan requires every translation unit that touches atomics to be built
+# with -fsanitize=thread, or you get undefined-symbol link errors — which is
+# exactly what happened, from JUCE's bundled HarfBuzz. ASan doesn't have that
+# requirement, so it coexists fine with non-instrumented third-party code, and
+# it's the right tool anyway for invalid-free/use-after-free/buffer-overflow
+# bugs specifically — it would have caught the bad WavAudioFormatWriter/
+# MemoryOutputStream ownership bug immediately, at the point of the bad
+# delete, rather than needing a crash log to track down after the fact.)
+option(SOMECHOPS_SANITIZE_ADDRESS "Build with AddressSanitizer + UndefinedBehaviorSanitizer enabled" OFF)
+if(SOMECHOPS_SANITIZE_ADDRESS)
+    message(STATUS "AddressSanitizer + UndefinedBehaviorSanitizer enabled")
+    target_compile_options(SomeChops PRIVATE -fsanitize=address,undefined -g -O1 -fno-omit-frame-pointer)
+    target_link_options(SomeChops PRIVATE -fsanitize=address,undefined)
+endif()

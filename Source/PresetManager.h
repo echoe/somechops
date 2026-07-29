@@ -15,26 +15,26 @@ public:
     static constexpr const char* fileExtension = ".dchp";
 
     bool savePreset (const juce::File& file, DrumSampler& sampler, Sequencer& sequencer,
-                      int currentPatternIndex, double bpm, const MidiMappingSettings& midi);
+                      int currentPatternIndex, double bpm, const MidiMappingSettings& midi, int uiTheme);
 
     // Returns true on success. On success, sampler/sequencer are updated in place.
     bool loadPreset (const juce::File& file, DrumSampler& sampler, Sequencer& sequencer,
-                      int& currentPatternIndexOut, double& bpmOut, MidiMappingSettings& midiOut);
+                      int& currentPatternIndexOut, double& bpmOut, MidiMappingSettings& midiOut, int& uiThemeOut);
 
     // Same as above but operating on an in-memory XML string (useful for the
     // host's getStateInformation/setStateInformation, which also need to save this).
     juce::String presetToXmlString (DrumSampler& sampler, Sequencer& sequencer,
-                                     int currentPatternIndex, double bpm, const MidiMappingSettings& midi);
+                                     int currentPatternIndex, double bpm, const MidiMappingSettings& midi, int uiTheme);
     bool loadFromXmlString (const juce::String& xmlString, DrumSampler& sampler, Sequencer& sequencer,
-                             int& currentPatternIndexOut, double& bpmOut, MidiMappingSettings& midiOut);
+                             int& currentPatternIndexOut, double& bpmOut, MidiMappingSettings& midiOut, int& uiThemeOut);
 
 private:
     juce::AudioFormatManager formatManager;
 
     std::unique_ptr<juce::XmlElement> buildXml (DrumSampler& sampler, Sequencer& sequencer,
-                                                 int currentPatternIndex, double bpm, const MidiMappingSettings& midi);
+                                                 int currentPatternIndex, double bpm, const MidiMappingSettings& midi, int uiTheme);
     bool applyXml (const juce::XmlElement& root, DrumSampler& sampler, Sequencer& sequencer,
-                   int& currentPatternIndexOut, double& bpmOut, MidiMappingSettings& midiOut);
+                   int& currentPatternIndexOut, double& bpmOut, MidiMappingSettings& midiOut, int& uiThemeOut);
 
     static juce::String encodeSampleAsBase64Wav (const juce::AudioBuffer<float>& buffer, double sampleRate);
     static bool decodeBase64WavToBuffer (const juce::String& base64, juce::AudioBuffer<float>& bufferOut, double& sampleRateOut);

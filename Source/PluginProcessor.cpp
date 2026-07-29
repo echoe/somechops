@@ -119,7 +119,7 @@ juce::AudioProcessorEditor* SomeChopsAudioProcessor::createEditor()
 
 void SomeChopsAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    auto xmlString = presetManager.presetToXmlString (sampler, sequencer, sequencer.getCurrentPatternIndex(), currentBpmForSave, midiSettings);
+    auto xmlString = presetManager.presetToXmlString (sampler, sequencer, sequencer.getCurrentPatternIndex(), currentBpmForSave, midiSettings, uiTheme);
     juce::MemoryOutputStream mos (destData, false);
     mos.writeString (xmlString);
 }
@@ -131,7 +131,7 @@ void SomeChopsAudioProcessor::setStateInformation (const void* data, int sizeInB
 
     int patternIndex = 0;
     double bpm = 120.0;
-    if (presetManager.loadFromXmlString (xmlString, sampler, sequencer, patternIndex, bpm, midiSettings))
+    if (presetManager.loadFromXmlString (xmlString, sampler, sequencer, patternIndex, bpm, midiSettings, uiTheme))
     {
         sequencer.setCurrentPatternIndex (patternIndex);
         currentBpmForSave = bpm;

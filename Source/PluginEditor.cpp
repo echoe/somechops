@@ -54,7 +54,7 @@ int WaveformSliceView::xToSample (int x) const
 
 void WaveformSliceView::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff1b1b1f));
+    g.fillAll (findColour (waveformBackgroundColourId));
 
     auto& sampler = processor.getSampler();
     const int numSamples = sampler.getSourceBuffer().getNumSamples();
@@ -70,7 +70,7 @@ void WaveformSliceView::paint (juce::Graphics& g)
     const int h = getHeight();
     const float midY = (float) h * 0.5f;
 
-    g.setColour (juce::Colour (0xff59b3ff));
+    g.setColour (findColour (waveformWaveColourId));
     for (int x = 0; x < w && x < (int) minCache.size(); ++x)
     {
         const float y1 = midY + minCache[(size_t) x] * midY;
@@ -84,10 +84,10 @@ void WaveformSliceView::paint (juce::Graphics& g)
         const int xStart = sampleToX (sl.startSample);
         const int xTrim = sampleToX (sl.trimmedEnd);
 
-        g.setColour (juce::Colours::white.withAlpha (0.85f));
+        g.setColour (findColour (sliceMarkerStartColourId).withAlpha (0.85f));
         g.drawVerticalLine (xStart, 0.0f, (float) h);
 
-        g.setColour (juce::Colours::orange.withAlpha (0.85f));
+        g.setColour (findColour (sliceMarkerTrimColourId).withAlpha (0.85f));
         g.drawVerticalLine (xTrim, 0.0f, (float) h);
 
         g.setColour (juce::Colours::white.withAlpha (0.6f));
@@ -213,7 +213,6 @@ SliceRangeRow::SliceRangeRow (SomeChopsAudioProcessor& p) : processor (p)
         addAndMakeVisible (label);
         label->setJustificationType (juce::Justification::centred);
         label->setFont (juce::Font (juce::FontOptions (11.0f)));
-        label->setColour (juce::Label::textColourId, juce::Colours::lightgrey);
         label->setText ("--", juce::dontSendNotification);
 
         auto* s = rangeSliders.add (new juce::Slider());
@@ -318,12 +317,16 @@ void StepGrid::timerCallback() { repaint(); }
 
 void StepGrid::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff141417));
+    g.fillAll (findColour (stepGridBackgroundColourId));
 
     const int rowH = getHeight() / kNumPads;
     const int colW = getWidth() / kNumSteps;
     const auto& sequencer = processor.getSequencer();
     const auto pattern = sequencer.getCurrentPatternSnapshot(); // one locked copy, not a live reference
+
+    const juce::Colour offColour = findColour (stepCellOffColourId);
+    const juce::Colour onColour = findColour (stepCellOnColourId);
+    const juce::Colour inactiveOffColour = findColour (stepCellInactiveLaneColourId);
 
     for (int pad = 0; pad < kNumPads; ++pad)
     {
@@ -336,11 +339,11 @@ void StepGrid::paint (juce::Graphics& g)
             const auto& stepData = pattern.tracks[(size_t) pad].steps[(size_t) step];
             const bool inActiveLane = step < laneLength;
 
-            juce::Colour c = juce::Colour (0xff2a2a30);
+            juce::Colour c = inActiveLane ? offColour : inactiveOffColour;
             if (stepData.enabled)
             {
                 const float alpha = juce::jmap (stepData.probability, 0.0f, 100.0f, 0.35f, 1.0f);
-                c = juce::Colours::limegreen.withAlpha (alpha);
+                c = onColour.withAlpha (alpha);
             }
 
             // Steps beyond this lane's own length won't play this loop — dim them
@@ -396,7 +399,6 @@ TrackLengthColumn::TrackLengthColumn (SomeChopsAudioProcessor& p) : processor (p
         addAndMakeVisible (label);
         label->setJustificationType (juce::Justification::centred);
         label->setFont (juce::Font (juce::FontOptions (11.0f)));
-        label->setColour (juce::Label::textColourId, juce::Colours::lightgrey);
         label->setText (juce::String (kNumSteps), juce::dontSendNotification);
 
         auto* s = lengthSliders.add (new juce::Slider());
@@ -474,7 +476,6 @@ SlicePitchRow::SlicePitchRow (SomeChopsAudioProcessor& p) : processor (p)
         addAndMakeVisible (label);
         label->setJustificationType (juce::Justification::centred);
         label->setFont (juce::Font (juce::FontOptions (11.0f)));
-        label->setColour (juce::Label::textColourId, juce::Colours::lightgrey);
         label->setText ("+0.0st", juce::dontSendNotification);
 
         auto* s = pitchSliders.add (new juce::Slider());
@@ -601,6 +602,20 @@ SettingsPanel::SettingsPanel (SomeChopsAudioProcessor& p) : processor (p)
     patternCountSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     patternCountSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 45, 20);
 
+    addAndMakeVisible (themeLabel);
+    addAndMakeVisible (themeSelector);
+    themeSelector.addItem ("Minimal", (int) UiTheme::Minimal + 1);
+    themeSelector.addItem ("Cute", (int) UiTheme::Cute + 1);
+    themeSelector.addItem ("Old-School", (int) UiTheme::OldSchool + 1);
+    themeSelector.addItem ("Futuristic", (int) UiTheme::Futuristic + 1);
+    themeSelector.onChange = [this]
+    {
+        const int newTheme = themeSelector.getSelectedId() - 1;
+        processor.uiTheme = newTheme;
+        if (onThemeChanged)
+            onThemeChanged (newTheme);
+    };
+
     addAndMakeVisible (closeButton);
     closeButton.onClick = [this] { setVisible (false); };
 
@@ -644,12 +659,13 @@ void SettingsPanel::refresh()
     startNoteName.setText (midiNoteName (m.startNote), juce::dontSendNotification);
     stopNoteSlider.setValue (m.stopNote, juce::dontSendNotification);
     stopNoteName.setText (midiNoteName (m.stopNote), juce::dontSendNotification);
+    themeSelector.setSelectedId (processor.uiTheme + 1, juce::dontSendNotification);
 }
 
 void SettingsPanel::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xf0101014));
-    g.setColour (juce::Colours::grey.withAlpha (0.4f));
+    g.fillAll (findColour (settingsPanelBackgroundColourId));
+    g.setColour (findColour (panelBorderColourId));
     g.drawRect (getLocalBounds().reduced (20), 1);
 }
 
@@ -679,6 +695,9 @@ void SettingsPanel::resized()
     layoutRow (bounds.removeFromTop (rowH), startNoteLabel, startNoteSlider, &startNoteName);
     bounds.removeFromTop (10);
     layoutRow (bounds.removeFromTop (rowH), stopNoteLabel, stopNoteSlider, &stopNoteName);
+    bounds.removeFromTop (10);
+    themeLabel.setBounds (bounds.removeFromTop (rowH).withWidth (170));
+    themeSelector.setBounds (themeLabel.getBounds().withX (themeLabel.getRight() + 10).withWidth (200));
 
     bounds.removeFromTop (20);
     closeButton.setBounds (bounds.removeFromTop (30).removeFromLeft (100));
@@ -693,6 +712,9 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
       trackLengthColumn (p),
       settingsPanel (p)
 {
+    setLookAndFeel (&lookAndFeel);
+    lookAndFeel.setTheme ((UiTheme) processor.uiTheme);
+
     setSize (1200, 930);
 
     addAndMakeVisible (loadButton);
@@ -844,6 +866,12 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
         settingsPanel.toFront (true);
     };
 
+    settingsPanel.onThemeChanged = [this] (int newTheme)
+    {
+        lookAndFeel.setTheme ((UiTheme) newTheme);
+        repaint(); // recursively redraws this editor and all its children with the new theme
+    };
+
     // --- callbacks ---
     loadButton.onClick = [this]
     {
@@ -884,7 +912,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
                         file = file.withFileExtension (".dchp");
 
                     processor.getPresetManager().savePreset (file, processor.getSampler(), processor.getSequencer(),
-                        processor.getSequencer().getCurrentPatternIndex(), processor.currentBpmForSave, processor.midiSettings);
+                        processor.getSequencer().getCurrentPatternIndex(), processor.currentBpmForSave, processor.midiSettings, processor.uiTheme);
                 }
             });
     };
@@ -900,7 +928,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
                 {
                     int patternIndex = 0;
                     double bpm = 120.0;
-                    if (processor.getPresetManager().loadPreset (file, processor.getSampler(), processor.getSequencer(), patternIndex, bpm, processor.midiSettings))
+                    if (processor.getPresetManager().loadPreset (file, processor.getSampler(), processor.getSequencer(), patternIndex, bpm, processor.midiSettings, processor.uiTheme))
                     {
                         processor.getSequencer().setCurrentPatternIndex (patternIndex);
                         refreshPatternSelector();
@@ -909,10 +937,11 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
                         processor.manualBpm = bpm;
                         bpmSlider.setValue (bpm, juce::dontSendNotification);
                         settingsPanel.refresh();
+                        lookAndFeel.setTheme ((UiTheme) processor.uiTheme);
                         selectedSlice = -1;
                         updateSelectedSliceControls();
                         waveformView.rebuildWaveformCache();
-                        waveformView.repaint();
+                        repaint();
                     }
                 }
             });
@@ -994,6 +1023,14 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     updateSelectedSliceControls();
 }
 
+SomeChopsAudioProcessorEditor::~SomeChopsAudioProcessorEditor()
+{
+    // Must be cleared before `lookAndFeel` (a member of this object) is destroyed —
+    // JUCE components hold a raw pointer to whatever LookAndFeel is set, and every
+    // child component here is still using this one via inheritance.
+    setLookAndFeel (nullptr);
+}
+
 void SomeChopsAudioProcessorEditor::refreshPatternSelector()
 {
     patternSelector.clear (juce::dontSendNotification);
@@ -1054,7 +1091,7 @@ void SomeChopsAudioProcessorEditor::updateSelectedSliceControls()
 
 void SomeChopsAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff0e0e10));
+    g.fillAll (findColour (juce::ResizableWindow::backgroundColourId));
 }
 
 void SomeChopsAudioProcessorEditor::resized()

@@ -68,6 +68,12 @@ public:
     // editable from the settings page.
     MidiMappingSettings midiSettings;
 
+    // Selected UI theme (see UiTheme in SomeChopsLookAndFeel.h), stored as a plain int
+    // here so this header doesn't need to pull in GUI headers. Only ever touched on the
+    // message thread (settings page, editor's LookAndFeel), so no atomic needed. 0 =
+    // UiTheme::Minimal, the default.
+    int uiTheme = 0;
+
 private:
     DrumSampler sampler;
     Sequencer sequencer;

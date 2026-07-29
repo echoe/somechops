@@ -60,13 +60,14 @@ bool PresetManager::decodeBase64WavToBuffer (const juce::String& base64, juce::A
 
 std::unique_ptr<juce::XmlElement> PresetManager::buildXml (DrumSampler& sampler, Sequencer& sequencer,
                                                              int currentPatternIndex, double bpm,
-                                                             const MidiMappingSettings& midi)
+                                                             const MidiMappingSettings& midi, int uiTheme)
 {
     auto root = std::make_unique<juce::XmlElement> ("SomeChopsPreset");
     root->setAttribute ("version", 1);
     root->setAttribute ("bpm", bpm);
     root->setAttribute ("currentPattern", currentPatternIndex);
     root->setAttribute ("chokeMode", sampler.getChokeMode());
+    root->setAttribute ("uiTheme", uiTheme);
 
     // --- MIDI note mapping ---
     auto* midiEl = root->createNewChildElement ("MidiMapping");
@@ -132,7 +133,7 @@ std::unique_ptr<juce::XmlElement> PresetManager::buildXml (DrumSampler& sampler,
 }
 
 bool PresetManager::applyXml (const juce::XmlElement& root, DrumSampler& sampler, Sequencer& sequencer,
-                               int& currentPatternIndexOut, double& bpmOut, MidiMappingSettings& midiOut)
+                               int& currentPatternIndexOut, double& bpmOut, MidiMappingSettings& midiOut, int& uiThemeOut)
 {
     // Accept the current tag name, plus the legacy one from before the project was
     // renamed from DrumChop to SomeChops, so old presets still load.
@@ -142,6 +143,7 @@ bool PresetManager::applyXml (const juce::XmlElement& root, DrumSampler& sampler
     bpmOut = root.getDoubleAttribute ("bpm", 120.0);
     currentPatternIndexOut = root.getIntAttribute ("currentPattern", 0);
     sampler.setChokeMode (root.getBoolAttribute ("chokeMode", false));
+    uiThemeOut = root.getIntAttribute ("uiTheme", uiThemeOut);
 
     if (auto* midiEl = root.getChildByName ("MidiMapping"))
     {
@@ -251,33 +253,33 @@ bool PresetManager::applyXml (const juce::XmlElement& root, DrumSampler& sampler
 }
 
 juce::String PresetManager::presetToXmlString (DrumSampler& sampler, Sequencer& sequencer,
-                                                 int currentPatternIndex, double bpm, const MidiMappingSettings& midi)
+                                                 int currentPatternIndex, double bpm, const MidiMappingSettings& midi, int uiTheme)
 {
-    auto xml = buildXml (sampler, sequencer, currentPatternIndex, bpm, midi);
+    auto xml = buildXml (sampler, sequencer, currentPatternIndex, bpm, midi, uiTheme);
     return xml->toString();
 }
 
 bool PresetManager::loadFromXmlString (const juce::String& xmlString, DrumSampler& sampler, Sequencer& sequencer,
-                                        int& currentPatternIndexOut, double& bpmOut, MidiMappingSettings& midiOut)
+                                        int& currentPatternIndexOut, double& bpmOut, MidiMappingSettings& midiOut, int& uiThemeOut)
 {
     auto xml = juce::XmlDocument::parse (xmlString);
     if (xml == nullptr)
         return false;
-    return applyXml (*xml, sampler, sequencer, currentPatternIndexOut, bpmOut, midiOut);
+    return applyXml (*xml, sampler, sequencer, currentPatternIndexOut, bpmOut, midiOut, uiThemeOut);
 }
 
 bool PresetManager::savePreset (const juce::File& file, DrumSampler& sampler, Sequencer& sequencer,
-                                 int currentPatternIndex, double bpm, const MidiMappingSettings& midi)
+                                 int currentPatternIndex, double bpm, const MidiMappingSettings& midi, int uiTheme)
 {
-    auto xml = buildXml (sampler, sequencer, currentPatternIndex, bpm, midi);
+    auto xml = buildXml (sampler, sequencer, currentPatternIndex, bpm, midi, uiTheme);
     return xml->writeTo (file);
 }
 
 bool PresetManager::loadPreset (const juce::File& file, DrumSampler& sampler, Sequencer& sequencer,
-                                 int& currentPatternIndexOut, double& bpmOut, MidiMappingSettings& midiOut)
+                                 int& currentPatternIndexOut, double& bpmOut, MidiMappingSettings& midiOut, int& uiThemeOut)
 {
     auto xml = juce::XmlDocument::parse (file);
     if (xml == nullptr)
         return false;
-    return applyXml (*xml, sampler, sequencer, currentPatternIndexOut, bpmOut, midiOut);
+    return applyXml (*xml, sampler, sequencer, currentPatternIndexOut, bpmOut, midiOut, uiThemeOut);
 }
