@@ -40,3 +40,6 @@ Once prerequisites are installed (see below), run build.sh on linux and mac, or 
 - sudo dnf install libXcursor-devel libXcomposite-devel gtk3-devel webkit2gtk4.1-devel freetype-devel curl-devel
 ### MacOS
 - xcode-select --install (everything else is already there by default)
+
+### Todo
+- Sequencer lock so it doesn't start when a DAW starts by default
