@@ -11,7 +11,9 @@ Adjust slice timings manually, by hand as well as with numbers. Play through sli
 
 Randomize the patterns. Play some chops.
 
-This entire plugin is basically based off of my memory of having the Teenage Engineering OP-1, which I hated other than its sample handler ... combined with my love for the elektron sequencing workflow and Fors's Dyad. With the op-1, you had to give it 12-second .wav files that it would automatically slice. With the automatic slicing and then it going directly into an elektron-ish pattern creator that you can set and make patterns in via randomness, you can basically load a sample in, press random, and then you get something unique that you can see if you like or not! Lots of interesting ear-candy-type things.
+This entire plugin is basically based off of my memory of having the Teenage Engineering OP-1, which I hated other than its sample handler ... combined with my love for the elektron sequencing workflow and Fors's Dyad. With the op-1, you had to give it 12-second .wav files that it would automatically slice. With the automatic slicing, it will usually give you something 'close enough'. You can also just quickly make a chromatic keyboard from a melodic sample!
+
+The unique thing compared to that is that it then goes directly into an elektron-ish pattern creator that you can set and make patterns in via randomness. So you can basically load a sample in, slice, press random, and then you get something unique that you can see if you like or not! Lots of interesting ear-candy-type things.
 
 This plugin works well with breakbeats, but I've found that it makes interesting content with any sort of looped sound! But it's really personal preference.
 
