@@ -98,9 +98,7 @@ private:
 
     // Guards sourceBuffer/slices/voices against the message thread (sample loading,
     // slicing, slider edits) and the audio thread (triggerPad/renderNextBlock)
-    // touching them at the same time. A prior version of this class had no such
-    // guard, which could crash — e.g. loadSample() clearing `slices` on the message
-    // thread while the audio thread was mid-render and still indexing into it.
+    // touching them at the same time.
     juce::CriticalSection lock;
 
     static constexpr int kFadeSamples = 64; // click-free fade out at slice end

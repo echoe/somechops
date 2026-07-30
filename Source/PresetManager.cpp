@@ -9,11 +9,6 @@ juce::String PresetManager::encodeSampleAsBase64Wav (const juce::AudioBuffer<flo
 {
     juce::MemoryBlock mb;
     {
-        // The current createWriterFor() takes ownership via a std::unique_ptr<OutputStream>&:
-        // on success it moves the stream into the writer and clears our unique_ptr; on
-        // failure it leaves our unique_ptr untouched, so it's freed normally when this
-        // scope ends either way — unlike the older raw-pointer overload this replaces,
-        // there's no manual new/delete bookkeeping needed here any more.
         std::unique_ptr<juce::OutputStream> mos (std::make_unique<juce::MemoryOutputStream> (mb, false));
 
         juce::WavAudioFormat wavFormat;
@@ -221,7 +216,7 @@ bool PresetManager::applyXml (const juce::XmlElement& root, DrumSampler& sampler
                     // Current format is enabled:ratchet:pitch:probability:nudge (5 fields).
                     // Earlier versions used enabled:ratchet:pitch:probability (4, no nudge)
                     // or enabled:ratchet:probability (3, no pitch or nudge). Handle all three
-                    // so older presets still load sensibly.
+                    // so older presets still load sensibly, and in case the format changes in future.
                     if (fields.size() >= 5)
                     {
                         step.pitchSemitones = fields[2].getFloatValue();

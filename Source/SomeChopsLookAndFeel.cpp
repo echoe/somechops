@@ -55,7 +55,7 @@ ThemePalette SomeChopsLookAndFeel::paletteFor (UiTheme t)
             break;
 
         case UiTheme::Futuristic:
-        case UiTheme::NumThemes: // not a real theme — sentinel/count value, never actually selected
+        case UiTheme::NumThemes: // not a real theme — sentinel/count value, never actually selected. in that case we failback to Futuristic.
         default:
             // Dark chrome + neon cyan glow.
             p.panelBackground = juce::Colour (0xff0c0c13);

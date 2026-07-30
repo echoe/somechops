@@ -1247,7 +1247,7 @@ void SomeChopsAudioProcessorEditor::resized()
 
     selectedStepLabel.setBounds (stepEditorRow.removeFromLeft (150));
     stepEditorRow.removeFromLeft (6);
-    // Ratchet/Pitch/Probability/Nudge sliders all kept the same width, per request.
+    // Ratchet/Pitch/Probability/Nudge sliders all kept the same width.
     stepRatchetLabel.setBounds (stepEditorRow.removeFromLeft (55));
     stepRatchetSlider.setBounds (stepEditorRow.removeFromLeft (185));
     stepEditorRow.removeFromLeft (12);
