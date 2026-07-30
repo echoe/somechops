@@ -746,6 +746,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     addAndMakeVisible (savePresetButton);
     addAndMakeVisible (loadPresetButton);
     addAndMakeVisible (playStopButton);
+    addAndMakeVisible (followHostTransportToggle);
     addAndMakeVisible (bpmSlider);
     addAndMakeVisible (bpmLabel);
     addAndMakeVisible (settingsButton);
@@ -964,6 +965,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
                         refreshPatternSelector();
                         quantizePatternChangeToggle.setToggleState (audioProcessor.midiSettings.quantizePatternChanges, juce::dontSendNotification);
                         resetPatternOnChangeToggle.setToggleState (audioProcessor.getSequencer().getResetPatternOnChange(), juce::dontSendNotification);
+                        followHostTransportToggle.setToggleState (audioProcessor.midiSettings.followHostTransport, juce::dontSendNotification);
                         audioProcessor.manualBpm = bpm;
                         bpmSlider.setValue (bpm, juce::dontSendNotification);
                         settingsPanel.refresh();
@@ -997,6 +999,12 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
         if (audioProcessor.manualPlayActive)
             audioProcessor.getSequencer().resetPosition();
         playStopButton.setButtonText (audioProcessor.manualPlayActive ? "Stop" : "Play");
+    };
+
+    followHostTransportToggle.setToggleState (audioProcessor.midiSettings.followHostTransport, juce::dontSendNotification);
+    followHostTransportToggle.onClick = [this]
+    {
+        audioProcessor.midiSettings.followHostTransport = followHostTransportToggle.getToggleState();
     };
 
     patternSelector.onChange = [this]
@@ -1169,6 +1177,8 @@ void SomeChopsAudioProcessorEditor::resized()
     loadPresetButton.setBounds (topBar.removeFromLeft (100));
     topBar.removeFromLeft (10);
     playStopButton.setBounds (topBar.removeFromLeft (90));
+    topBar.removeFromLeft (10);
+    followHostTransportToggle.setBounds (topBar.removeFromLeft (170));
 
     r.removeFromTop (6);
     waveformView.setBounds (r.removeFromTop (160));

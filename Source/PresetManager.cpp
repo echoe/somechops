@@ -73,6 +73,7 @@ std::unique_ptr<juce::XmlElement> PresetManager::buildXml (DrumSampler& sampler,
     midiEl->setAttribute ("startNote", midi.startNote);
     midiEl->setAttribute ("stopNote", midi.stopNote);
     midiEl->setAttribute ("quantizePatternChanges", midi.quantizePatternChanges);
+    midiEl->setAttribute ("followHostTransport", midi.followHostTransport);
 
     // --- Sample ---
     auto* sampleEl = root->createNewChildElement ("Sample");
@@ -148,6 +149,7 @@ bool PresetManager::applyXml (const juce::XmlElement& root, DrumSampler& sampler
         midiOut.startNote = midiEl->getIntAttribute ("startNote", midiOut.startNote);
         midiOut.stopNote = midiEl->getIntAttribute ("stopNote", midiOut.stopNote);
         midiOut.quantizePatternChanges = midiEl->getBoolAttribute ("quantizePatternChanges", midiOut.quantizePatternChanges);
+        midiOut.followHostTransport = midiEl->getBoolAttribute ("followHostTransport", midiOut.followHostTransport);
     }
 
     if (auto* sampleEl = root.getChildByName ("Sample"))

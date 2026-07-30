@@ -56,7 +56,7 @@ void SomeChopsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
         }
     }
     currentBpmForSave = bpm;
-    const bool effectivePlaying = isPlaying || manualPlayActive;
+    const bool effectivePlaying = (isPlaying && midiSettings.followHostTransport) || manualPlayActive;
     sequencer.setHostInfo (bpm, effectivePlaying);
 
     // --- MIDI: pads, pattern switching (for live performance), and start/stop ---

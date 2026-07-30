@@ -227,6 +227,7 @@ private:
     juce::TextButton savePresetButton { "Save Preset" };
     juce::TextButton loadPresetButton { "Load Preset" };
     juce::TextButton playStopButton { "Play" };
+    juce::ToggleButton followHostTransportToggle { "Follow Host Transport" };
     juce::Slider bpmSlider;
     juce::Label bpmLabel { {}, "BPM" };
     juce::TextButton settingsButton { "Settings" };

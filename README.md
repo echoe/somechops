@@ -17,7 +17,7 @@ This plugin works well with breakbeats, but I've found that it makes interesting
 
 ## Walkthrough
 
-- On the top bar, load a sample, auto-slice, save and load presets, play and stop the sequencer, open settings (change MIDI note settings and theme), and change the BPM the sequence plays at (in standalone mode).
+- On the top bar, load a sample, auto-slice, save and load presets, play and stop the sequencer, toggle 'Follow Host Transport' for the sequencer, open settings (change MIDI note settings and theme), and change the BPM the sequence plays at (in standalone mode).
 
 - The top screen shows the slices. The plugin shows your sample there, and auto-slices using a transient detector. You can adjust the slice sensitivity and reslice if you think it got it wrong, or if you want to slice at specific times you can move the sliders. You can also change the pitch of each slice up or down two octaves! If you want to set exact slicing or an exact pitch amount, you can click on the slice, then edit it with the edit options at the bottom. There's also an option here to set choke points on in case you want them, I like having choke points on and it's a giant PITA to click every slice so ... yeah. Shortcuts.
 
@@ -42,6 +42,3 @@ Once prerequisites are installed (see below), run build.sh on linux and mac, or 
 - sudo dnf install libXcursor-devel libXcomposite-devel gtk3-devel webkit2gtk4.1-devel freetype-devel curl-devel
 ### MacOS
 - xcode-select --install (everything else is already there by default)
-
-### Todo
-- Sequencer lock so it doesn't start when a DAW starts by default

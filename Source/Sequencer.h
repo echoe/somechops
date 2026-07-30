@@ -19,6 +19,14 @@ struct MidiMappingSettings
     int startNote = 59;             // B3
     int stopNote = 60;              // C4
     bool quantizePatternChanges = false; // shared with the "Wait for pattern end" toggle in the UI
+
+    // When true (default): the sequencer runs whenever the DAW transport is playing,
+    // same as always. When false: host transport play state is ignored entirely, and
+    // only the manual Play/Stop button or MIDI start/stop notes can start/stop it —
+    // useful if you don't want the sequencer auto-starting the instant the DAW's
+    // transport starts (e.g. using this as a one-shot/manually-triggered instrument
+    // within a larger arrangement). Shared with the "Follow Host Transport" toggle.
+    bool followHostTransport = true;
 };
 
 struct StepData
