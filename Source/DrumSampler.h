@@ -68,6 +68,27 @@ public:
     void setSliceTrimmedLength (int sliceIndex, int newTrimmedEnd);
     void setSlicePitch (int sliceIndex, float semitones);
     void setSliceChokeGroup (int sliceIndex, int chokeGroup);
+
+    // "Chromatic" tool: copies the given slice's sample region (start/end/trim), choke
+    // group, and name onto every pad, then re-tunes each pad's basePitch so the whole
+    // set of pads plays chromatically across one octave — pad i ends up at the source
+    // slice's basePitch + (i - sourceSliceIndex) semitones, so the pad you picked keeps
+    // its original pitch and the rest fan out chromatically around it. Always leaves
+    // exactly kNumPads slices afterwards, even if there were more or fewer before (e.g.
+    // from auto-slice finding a different number of transients than there are pads).
+    // Returns false (and does nothing) if sourceSliceIndex doesn't currently have a
+    // valid slice to copy from.
+    bool makeChromaticFrom (int sourceSliceIndex);
+
+    // Undoes the most recent makeChromaticFrom() call, restoring every slice exactly as
+    // it was immediately beforehand. Only one level of undo is kept — a second
+    // makeChromaticFrom() call overwrites the previous snapshot, and loading a new
+    // sample/preset or re-running auto-slice invalidates it entirely (there's nothing
+    // sensible to revert to any more). Returns false (and does nothing) if there's no
+    // chromatic change currently available to undo.
+    bool undoChromatic();
+    bool canUndoChromatic() const { return hasChromaticBackup; }
+
     int getNumSlices() const { return (int) slices.size(); }
     const Slice& getSlice (int index) const { return slices[(size_t) index]; }
     std::vector<Slice>& getSlices() { return slices; }
@@ -96,9 +117,18 @@ private:
     std::vector<Slice> slices;
     std::array<DrumVoice, kMaxVoices> voices;
 
+    // One-level undo snapshot for makeChromaticFrom(). Only meaningful while
+    // hasChromaticBackup is true; invalidated (along with the flag) by anything that
+    // replaces `slices` wholesale (loadSample, autoSlice, a fresh setSlices from a
+    // preset load) since there'd be nothing coherent left to revert to.
+    std::vector<Slice> slicesBeforeChromatic;
+    bool hasChromaticBackup = false;
+
     // Guards sourceBuffer/slices/voices against the message thread (sample loading,
     // slicing, slider edits) and the audio thread (triggerPad/renderNextBlock)
-    // touching them at the same time.
+    // touching them at the same time. A prior version of this class had no such
+    // guard, which could crash — e.g. loadSample() clearing `slices` on the message
+    // thread while the audio thread was mid-render and still indexing into it.
     juce::CriticalSection lock;
 
     static constexpr int kFadeSamples = 64; // click-free fade out at slice end

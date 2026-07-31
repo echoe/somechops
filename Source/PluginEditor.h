@@ -274,6 +274,20 @@ private:
     // all choke together (e.g. every hi-hat variation you've got sliced out).
     juce::TextButton chokeGroupAllButton { "Choke Group All (1)" };
 
+    // "Chromatic" tool: click this to arm it, then click a pad — that pad's slice gets
+    // copied onto every other pad, then each pad is re-tuned so the whole kit plays
+    // chromatically across one octave (see DrumSampler::makeChromaticFrom). Armed state
+    // is purely a UI concept (not persisted); the button's text reflects it.
+    juce::TextButton chromaticButton { "Chromatic" };
+    bool chromaticArmed = false;
+
+    // Reverts the most recent Chromatic action (see DrumSampler::undoChromatic).
+    // Enabled/disabled to reflect DrumSampler::canUndoChromatic() at the points where
+    // that can change — right after a successful chromatic mapping, right after this
+    // button is used, and after anything that invalidates the backup outright (loading
+    // a new sample, auto-slice, or loading a preset).
+    juce::TextButton undoChromaticButton { "Undo Chromatic" };
+
     std::unique_ptr<juce::FileChooser> fileChooser;
     SettingsPanel settingsPanel;
 
@@ -284,6 +298,7 @@ private:
     void updateSelectedStepControls();
     void updateSelectedSliceControls();
     void refreshPatternSelector();
+    void updateChromaticUndoButtonState();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SomeChopsAudioProcessorEditor)
 };

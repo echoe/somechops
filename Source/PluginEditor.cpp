@@ -765,6 +765,8 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     addAndMakeVisible (sliceChokeGroupFieldLabel);
     addAndMakeVisible (sliceChokeGroupEditor);
     addAndMakeVisible (chokeGroupAllButton);
+    addAndMakeVisible (chromaticButton);
+    addAndMakeVisible (undoChromaticButton);
     addAndMakeVisible (patternSelector);
     addAndMakeVisible (randomizeButton);
     addAndMakeVisible (clearButton);
@@ -876,8 +878,20 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
 
     padGrid.onPadSelected = [this] (int pad)
     {
+        if (chromaticArmed)
+        {
+            if (audioProcessor.getSampler().makeChromaticFrom (pad))
+            {
+                chromaticArmed = false;
+                chromaticButton.setButtonText ("Chromatic");
+                updateChromaticUndoButtonState();
+            }
+            // else: pad clicked has no slice loaded yet — stay armed so the user can pick another
+        }
+
         selectedSlice = pad;
         updateSelectedSliceControls();
+        waveformView.repaint();
     };
     sliceRangeRow.onSliceChanged = [this]
     {
@@ -887,6 +901,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
     slicePitchRow.onPitchChanged = [this] { updateSelectedSliceControls(); };
 
     refreshPatternSelector();
+    updateChromaticUndoButtonState();
 
     bpmSlider.onValueChange = [this] { audioProcessor.manualBpm = bpmSlider.getValue(); };
 
@@ -916,6 +931,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
                     audioProcessor.loadSampleFromFile (file);
                     selectedSlice = -1;
                     updateSelectedSliceControls();
+                    updateChromaticUndoButtonState();
                     waveformView.rebuildWaveformCache();
                     waveformView.repaint();
                 }
@@ -927,6 +943,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
         audioProcessor.getSampler().autoSlice ((float) sensitivitySlider.getValue());
         selectedSlice = -1;
         updateSelectedSliceControls();
+        updateChromaticUndoButtonState();
         waveformView.repaint();
     };
 
@@ -972,6 +989,7 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
                         lookAndFeel.setTheme ((UiTheme) audioProcessor.uiTheme);
                         selectedSlice = -1;
                         updateSelectedSliceControls();
+                        updateChromaticUndoButtonState();
                         waveformView.rebuildWaveformCache();
                         repaint();
                     }
@@ -1038,6 +1056,22 @@ SomeChopsAudioProcessorEditor::SomeChopsAudioProcessorEditor (SomeChopsAudioProc
         updateSelectedSliceControls(); // refresh the field if the selected slice is one of these
     };
 
+    chromaticButton.onClick = [this]
+    {
+        chromaticArmed = ! chromaticArmed;
+        chromaticButton.setButtonText (chromaticArmed ? "Chromatic (click a pad)" : "Chromatic");
+    };
+
+    undoChromaticButton.onClick = [this]
+    {
+        if (audioProcessor.getSampler().undoChromatic())
+        {
+            updateChromaticUndoButtonState();
+            updateSelectedSliceControls();
+            waveformView.repaint();
+        }
+    };
+
     stepGrid.onStepSelected = [this] (int pad, int step)
     {
         selectedPad = pad;
@@ -1084,6 +1118,11 @@ void SomeChopsAudioProcessorEditor::refreshPatternSelector()
     for (int i = 0; i < kNumPatterns; ++i)
         patternSelector.addItem ("Pattern " + juce::String (i + 1), i + 1);
     patternSelector.setSelectedId (audioProcessor.getSequencer().getCurrentPatternIndex() + 1, juce::dontSendNotification);
+}
+
+void SomeChopsAudioProcessorEditor::updateChromaticUndoButtonState()
+{
+    undoChromaticButton.setEnabled (audioProcessor.getSampler().canUndoChromatic());
 }
 
 void SomeChopsAudioProcessorEditor::updateSelectedStepControls()
@@ -1211,6 +1250,12 @@ void SomeChopsAudioProcessorEditor::resized()
     sliceEditorBar.removeFromLeft (14);
     chokeGroupAllButton.setBounds (sliceEditorBar.removeFromLeft (160));
 
+    r.removeFromTop (6);
+    auto chromaticBar = r.removeFromTop (28);
+    chromaticButton.setBounds (chromaticBar.removeFromLeft (220));
+    chromaticBar.removeFromLeft (10);
+    undoChromaticButton.setBounds (chromaticBar.removeFromLeft (140));
+
     // Divider between the per-slice controls above and the sequencer controls below.
     r.removeFromTop (10);
     sliceSequencerDividerBounds = r.removeFromTop (2);
@@ -1247,7 +1292,7 @@ void SomeChopsAudioProcessorEditor::resized()
 
     selectedStepLabel.setBounds (stepEditorRow.removeFromLeft (150));
     stepEditorRow.removeFromLeft (6);
-    // Ratchet/Pitch/Probability/Nudge sliders all kept the same width.
+    // Ratchet/Pitch/Probability/Nudge sliders all kept the same width, per request.
     stepRatchetLabel.setBounds (stepEditorRow.removeFromLeft (55));
     stepRatchetSlider.setBounds (stepEditorRow.removeFromLeft (185));
     stepEditorRow.removeFromLeft (12);

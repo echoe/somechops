@@ -17,6 +17,7 @@ void DrumSampler::loadSample (juce::AudioBuffer<float> newSample, double sourceS
     sourceBuffer = std::move (newSample);
     sourceSampleRate = sourceSR;
     slices.clear();
+    hasChromaticBackup = false; // any pending chromatic undo no longer applies to the new sample
     stopAllVoices(); // safe to call while already holding `lock` — CriticalSection is re-entrant
 }
 
@@ -53,6 +54,7 @@ void DrumSampler::autoSlice (float sensitivity)
 
     const juce::ScopedLock sl (lock);
     slices = std::move (newSlices);
+    hasChromaticBackup = false; // any pending chromatic undo no longer applies to the new slicing
 }
 
 void DrumSampler::setSliceBounds (int sliceIndex, int startSample, int endSample)
@@ -79,7 +81,13 @@ void DrumSampler::setSliceTrimmedLength (int sliceIndex, int newTrimmedEnd)
 
     auto& slc = slices[(size_t) sliceIndex];
 
-    // Trimming is allowed out to the full length of the loaded sample, so we need a new upperBound for that
+    // Trimming is allowed out to the full length of the loaded sample, not capped at
+    // this slice's endSample — which, for every slice but the last, is simply wherever
+    // the *next* auto-detected onset happened to land. Slices are explicitly allowed to
+    // overlap (nothing here clamps a slice against its neighbors), so stretching one out
+    // past a neighbor's start is legitimate and shouldn't be silently capped. endSample
+    // is pulled forward to match whenever trimmedEnd grows past it, since setSliceBounds
+    // relies on endSample always being >= trimmedEnd.
     const int upperBound = juce::jmax (slc.startSample + 1, sourceBuffer.getNumSamples());
     slc.trimmedEnd = juce::jlimit (slc.startSample + 1, upperBound, newTrimmedEnd);
     slc.endSample = juce::jmax (slc.endSample, slc.trimmedEnd);
@@ -105,10 +113,46 @@ void DrumSampler::setSliceChokeGroup (int sliceIndex, int chokeGroup)
     slices[(size_t) sliceIndex].chokeGroup = juce::jmax (0, chokeGroup);
 }
 
+bool DrumSampler::makeChromaticFrom (int sourceSliceIndex)
+{
+    const juce::ScopedLock sl (lock);
+
+    if (sourceSliceIndex < 0 || sourceSliceIndex >= (int) slices.size())
+        return false;
+
+    slicesBeforeChromatic = slices; // snapshot for undo, taken before anything below changes
+    hasChromaticBackup = true;
+
+    const Slice source = slices[(size_t) sourceSliceIndex]; // copy: about to overwrite the whole vector
+
+    // Always ends up with exactly kNumPads slices — one per pad — regardless of how
+    // many slices existed before (auto-slice may have found more or fewer transients
+    // than there are pads).
+    slices.assign ((size_t) kNumPads, source);
+
+    for (int i = 0; i < kNumPads; ++i)
+        slices[(size_t) i].basePitch = juce::jlimit (-24.0f, 24.0f, source.basePitch + (float) (i - sourceSliceIndex));
+
+    return true;
+}
+
+bool DrumSampler::undoChromatic()
+{
+    const juce::ScopedLock sl (lock);
+
+    if (! hasChromaticBackup)
+        return false;
+
+    slices = std::move (slicesBeforeChromatic);
+    hasChromaticBackup = false;
+    return true;
+}
+
 void DrumSampler::setSlices (std::vector<Slice> newSlices)
 {
     const juce::ScopedLock sl (lock);
     slices = std::move (newSlices);
+    hasChromaticBackup = false; // any pending chromatic undo no longer applies (e.g. a preset just loaded)
 }
 
 int DrumSampler::findFreeVoice()
