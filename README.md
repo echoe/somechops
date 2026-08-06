@@ -43,4 +43,5 @@ Once prerequisites are installed (see below), run build.sh on linux and mac, or 
 - sudo dnf install cmake gcc-c++ git alsa-lib-devel freetype-devel fontconfig-devel libX11-devel libXinerama-devel libXext-devel libXrandr-devel
 - sudo dnf install libXcursor-devel libXcomposite-devel gtk3-devel webkit2gtk4.1-devel freetype-devel curl-devel
 ### MacOS
-- xcode-select --install (everything else is already there by default)
+- xcode-select --install
+- brew install cmake
